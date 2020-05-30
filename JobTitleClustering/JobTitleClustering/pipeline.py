@@ -32,7 +32,10 @@ class Pipeline:
         # Harded-coded [0] is dangerous but the DB should be sanitized to ensure this always exists
         skills = []
         for profile in self.collection.find(conditions, mask):
-            skills.append([profile["experience"][0]["title"]["name"]] + [skill["name"] for skill in profile["skills"]])
+            try:
+                skills.append([profile["experience"][0]["title"]["name"]] + [skill["name"] for skill in profile["skills"]])
+            except (KeyError, IndexError):
+                continue
 
         # Create a padded numpy array so we can take advantage of some numpy functionalities
         skills_arr = np.array(skills, dtype=object)
@@ -45,11 +48,14 @@ class Pipeline:
         return skills_arr_padded, skills
 
     def get_all_skills(self):
-        conditions = {"skills": {"$exists": True, "$ne": []}}
+        conditions = {"skills": {"$exists": True, "$ne": []}, "experience.title": {"$exists": True, "$ne": []}}
         mask = {"_id": 0, "experience.title.name": 1, "skills": 1}
         skills = []
         for profile in self.collection.find(conditions, mask):
-            skills.append([profile["experience"][0]["title"]["name"]] + [skill["name"] for skill in profile["skills"]])
+            try:
+                skills.append([profile["experience"][0]["title"]["name"]] + [skill["name"] for skill in profile["skills"]])
+            except (KeyError, IndexError):
+                continue
 
         # Create a padded numpy array so we can take advantage of some numpy functionalities
         skills_arr = np.array(skills, dtype=object)
