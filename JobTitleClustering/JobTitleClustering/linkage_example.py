@@ -32,7 +32,7 @@ if writeDFs:
 
 print("Clustering")
 # Cluster!
-clustering = linkage(data_reduced_df[cols_to_include.tolist()], method="single", metric="hamming")
+clustering = linkage(data_reduced_df[cols_to_include.tolist()].to_numpy(), method="single", metric="hamming")
 with open("matrix.txt", "w+") as file:
     np.savetxt(file, clustering, fmt="%.5f")
 
