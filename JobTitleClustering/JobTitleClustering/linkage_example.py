@@ -4,13 +4,14 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 from pipeline import Pipeline
 from scipy.cluster.hierarchy import dendrogram, linkage
+from matplotlib import pyplot as plt
 
 writeDFs = True
 
 data_extractor = Pipeline("FutureFitAI_database", "talent_profiles")
 print("Getting skills")
-# titles, data, data_flat = data_extractor.get_skills_by_titles(["data scientist", "data engineer"])
-titles, data, data_flat = data_extractor.get_skills_by_titles(["data scientist", "data engineer", "marketing manager", "brand manager"])
+titles, data, data_flat = data_extractor.get_skills_by_titles(["data scientist", "data engineer"])
+# titles, data, data_flat = data_extractor.get_skills_by_titles(["data scientist", "data engineer", "marketing manager", "brand manager"])
 # titles, data, data_flat = data_extractor.get_all_skills()
 
 print("Preprocessing - creating mask")
@@ -25,6 +26,8 @@ labelenc = LabelEncoder()
 labelenc.fit(data_flat_reduced.drop_duplicates().tolist())
 
 print("Preprocessing - encoding data row by row")
+# This is more pythonic but can't write progress!
+# data_encoded = [labelenc.transform([skill for skill in row if skill in labelenc.classes_]) for row in data]
 data_encoded = []
 for index, row in enumerate(data):
     sys.stdout.write("\r")
@@ -37,11 +40,8 @@ for index, row in enumerate(data):
     data_encoded.append(row_enc)
 print()
 
-# This is more pythonic but can't write progress!
-# data_encoded = [labelenc.transform([skill for skill in row if skill in labelenc.classes_]) for row in data]
-
-print("Preprocessing - creating dataframe")
-data_encoded_df = pd.DataFrame(0, index=np.arange(len(data_encoded)), columns=labelenc.classes_, dtype=int)
+print("Preprocessing - creating empty dataframe")
+data_encoded_df = pd.DataFrame(0, index=np.arange(len(data_encoded)), columns=labelenc.classes_, dtype=np.int8)
 
 print("Preprocessing - preparing dataframe")
 for index, entry in enumerate(data_encoded):
@@ -60,3 +60,16 @@ print("Clustering")
 clustering = linkage(data_encoded_df[labelenc.classes_].to_numpy(), method="single", metric="hamming")
 with open("D:/FutureFit/matrix.txt", "w+") as file:
     np.savetxt(file, clustering, fmt="%.5f")
+
+plt.figure(figsize=(25, 10))
+plt.title('Hierarchical Clustering Dendrogram')
+plt.xlabel('sample index')
+plt.ylabel('distance')
+dendrogram(
+    clustering,
+    leaf_rotation=90.,  # rotates the x axis labels
+    leaf_font_size=8.,  # font size for the x axis labels
+    labels=titles,
+)
+plt.savefig("D:/FutureFit/dendrogram.png")
+plt.close()
