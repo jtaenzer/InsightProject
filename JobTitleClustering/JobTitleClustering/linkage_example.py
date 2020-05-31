@@ -7,8 +7,6 @@ from pipeline import Pipeline
 from scipy.cluster.hierarchy import dendrogram, linkage
 from matplotlib import pyplot as plt
 
-writeDFs = True
-
 data_extractor = Pipeline("FutureFitAI_database", "talent_profiles")
 print("Getting skills")
 # titles, data, data_flat = data_extractor.get_skills_by_titles(["data scientist", "data engineer"])
