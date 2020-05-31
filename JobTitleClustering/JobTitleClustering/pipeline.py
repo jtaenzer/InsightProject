@@ -17,7 +17,7 @@ class Pipeline:
     # Used to create categorical dataset for the clustering model
     def get_all_skills(self):
         conditions = dict()
-        conditions["$or"] = [{"skills": {"$exists": True, "$ne": []}},
+        conditions["$and"] = [{"skills": {"$exists": True, "$ne": []}},
                              {"experience.title": {"$exists": True, "$ne": []}}]
         mask = {"_id": 0, "experience.title.name": 1, "skills": 1}
         skills_flat = []
@@ -29,8 +29,7 @@ class Pipeline:
                 skills_flat.extend(tmp)
                 skills_data.append(tmp)
                 titles.append(profile["experience"][0]["title"]["name"])
-            except (KeyError, IndexError) as err:
-                print("Encountered error while gathering data:", err)
+            except (KeyError, IndexError):
                 continue
         return titles, skills_data, skills_flat
 
@@ -58,7 +57,6 @@ class Pipeline:
                 skills_flat.extend(tmp)
                 skills_data.append(tmp)
                 titles.append(profile["experience"][0]["title"]["name"])
-            except (KeyError, IndexError) as err:
-                print("Encountered error while gathering data:", err)
+            except (KeyError, IndexError):
                 continue
         return titles, skills_data, skills_flat
