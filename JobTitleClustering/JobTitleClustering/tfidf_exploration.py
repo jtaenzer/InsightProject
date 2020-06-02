@@ -12,12 +12,13 @@ from matplotlib import pyplot as plt
 # Configuration -- could go in a separate config but this is just an exploration script!
 remake_data = True
 titles_to_extract = ["data scientist", "marketing manager"]
-skill_depth = 25
-save_path = "D:/FutureFit/tfidf_exploration/skill_depth_{0}_{1}/".format(str(skill_depth), "_".join(titles_to_extract).replace(" ", "_"))
+skill_depth = 100
+save_path = "./skill_depth_{0}_{1}/".format(str(skill_depth), "_".join(titles_to_extract).replace(" ", "_"))
 min_skill_length = 5
-profile_depth = 150
+profile_depth = 100
 linkages = ['ward', 'single', 'complete', 'average']
 affinities = ['euclidean', 'l1', 'l2', 'manhattan', 'cosine']
+color_palette = ['r', 'g', 'b', 'y', 'c', 'm', 'k']
 
 # Create the directory to save plots and models, if it doesn't exist already
 if not os.path.exists(save_path):
@@ -85,13 +86,10 @@ for linkage in linkages:
         plt.title("Hierarchical Clustering Dendrogram")
         plt.xlabel("job title")
         plt.ylabel("distance")
-        dendrogram(linkage_matrix, leaf_rotation=90., leaf_font_size=5., labels=titles_for_plotting)
+        dendrogram(linkage_matrix, leaf_rotation=90., leaf_font_size=5, labels=titles_for_plotting)
         ax = plt.gca()
         xlbls = ax.get_xmajorticklabels()
         for lbl in xlbls:
-            if titles_to_extract[0] in lbl.get_text():
-                lbl.set_color('b')
-            else:
-                lbl.set_color('r')
+            lbl.set_color(color_palette[titles_to_extract.index(lbl.get_text())])
         plt.savefig(save_path + "clustering_{0}_{1}.png".format(linkage, affinity))
         plt.close()
