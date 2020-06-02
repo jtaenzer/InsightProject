@@ -13,7 +13,7 @@ from matplotlib import pyplot as plt
 remake_data = True
 titles_to_extract = ["data scientist", "marketing manager"]
 skill_depth = 25
-save_path = "D:/FutureFit/tfidf_exploration/skill_depth_{}_/".format(str(skill_depth), "_".join(titles_to_extract).replace(" ", "_"))
+save_path = "D:/FutureFit/tfidf_exploration/skill_depth_{0}_{1}/".format(str(skill_depth), "_".join(titles_to_extract).replace(" ", "_"))
 min_skill_length = 5
 profile_depth = 150
 linkages = ['ward', 'single', 'complete', 'average']
