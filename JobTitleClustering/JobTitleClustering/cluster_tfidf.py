@@ -49,7 +49,7 @@ mask = titles_ser.isin(titles_ser.value_counts()[:min_title_freq].index)
 titles_reduced = titles_ser[mask]
 
 data_clean = []
-print("Cleaning data")
+print("Cleaning data -- title min frequency")
 for index, check in enumerate(mask):
     if index % 1000 == 0:
         sys.stdout.write("\r")
@@ -76,11 +76,25 @@ print("Removing empty rows from the data")
 data_tfidf_matrix = data_tfidf_matrix.toarray()
 mask = np.sum(data_tfidf_matrix, axis=1) != 0
 data_tfidf_matrix = data_tfidf_matrix[mask]
-titles = np.array(titles, dtype=str)
-titles = titles[mask].tolist()
+titles_reduced = np.array(titles_reduced, dtype=str)
+titles_reduced = titles_reduced[mask].tolist()
+
+print("Cleaning data -- remove empty rows")
+data_clean_no_empty_rows = []
+for index, check in enumerate(mask):
+    if index % 1000 == 0:
+        sys.stdout.write("\r")
+        sys.stdout.write("{:2.0f}".format(float(index / len(mask)) * 100) + "%")
+    if check:
+        data_clean_no_empty_rows.append(data_clean[index])
+print()
 
 print("Clustering")
 # Create and fit the model, dump output to a pickle in case we need it later
 model = AgglomerativeClustering(affinity='euclidean', linkage='ward', n_clusters=n_cluster_stop)
 clustering = model.fit(data_tfidf_matrix)
+# Dump the clustering linkage matrix, the cleaned titles/data, and the tfidf matrix
 dump(clustering, save_path + "clustering.joblib")
+dump(data_tfidf_matrix, save_path + "data_tfidf_matrix.joblib")
+dump(titles_reduced, save_path + "titles_cleaned_for_clustering.joblib")
+dump(data_clean_no_empty_rows, save_path + "data_cleaned_for_clustering.joblib")
