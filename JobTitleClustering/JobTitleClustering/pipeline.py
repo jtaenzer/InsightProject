@@ -1,5 +1,6 @@
-from pymongo import MongoClient
+import sys
 import bson
+from pymongo import MongoClient
 
 """
 pipeline.py extracts information from the mongoDB
@@ -13,24 +14,37 @@ class Pipeline:
         self.db = self.client[db_name]
         self.collection = self.db[collection_name]
 
-    # Creates a list of lists where each sub-list contains the skills from a profile in the DB
+    # Creates a list strings where each string contains the skills from a profile in the DB
     # Used to create categorical dataset for the clustering model
-    def get_all_skills(self):
+    def get_all_skills(self, min_skill_length=5):
         conditions = dict()
         conditions["$and"] = [{"skills": {"$exists": True, "$ne": []}},
                              {"experience.title": {"$exists": True, "$ne": []}}]
-        mask = {"_id": 0, "experience.title.name": 1, "skills": 1}
+        mask = {"_id": 0, "skills": 1, "experience.is_primary": 1, "experience.title.name": 1}
         skills_flat = []
         skills_data = []
         titles = []
-        for profile in self.collection.find(conditions, mask):
+        profiles = self.collection.find(conditions, mask)
+        for index, profile in enumerate(profiles):
+            if index % 1000 == 0:
+                sys.stdout.write("\r")
+                sys.stdout.write("{:2.0f}".format(float(index / 3800000) * 100) + "%")
+            tmp = []
+            # Make sure we get a title and some skills from each profile
             try:
-                tmp = [skill["name"] for skill in profile["skills"]]
-                skills_flat.extend(tmp)
-                skills_data.append(tmp)
+                tmp.extend([skill["name"] for skill in profile["skills"]])
+            except KeyError:
+                continue
+            try:
                 titles.append(profile["experience"][0]["title"]["name"])
             except (KeyError, IndexError):
                 continue
+            # Hyperparameter tuning
+            if len(tmp) < min_skill_length:
+                continue
+            skills_flat.extend(tmp)
+            skills_data.append(" ".join(tmp))
+        print()
         return titles, skills_data, skills_flat
 
     # Similar to get_all_skills but allows filtering by known job titles
