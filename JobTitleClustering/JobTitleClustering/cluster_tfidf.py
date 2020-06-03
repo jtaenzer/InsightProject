@@ -62,13 +62,11 @@ print("Transforming data to count matrix")
 mask = vocab_for_counts.isin(vocab_for_counts.value_counts()[:min_skill_freq].index)
 count_vectorizer = CountVectorizer(vocabulary=vocab_for_counts[mask].drop_duplicates().tolist())
 data_count_matrix = count_vectorizer.transform(data_clean)
-print(data_count_matrix.shape)
 dump(count_vectorizer, save_path + "count_vectorizer.joblib")
 
 print("Transforming data to tfidf matrix")
 tfidf_transformer = TfidfTransformer()
 data_tfidf_matrix = tfidf_transformer.fit_transform(data_count_matrix)
-print(data_tfidf_matrix.shape)
 dump(tfidf_transformer, save_path + "tfidf_transformer.joblib")
 
 print("Removing empty rows from the data")
