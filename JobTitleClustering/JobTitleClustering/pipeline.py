@@ -29,21 +29,21 @@ class Pipeline:
             if index % 1000 == 0:
                 sys.stdout.write("\r")
                 sys.stdout.write("{:2.0f}".format(float(index / 3800000) * 100) + "%")
-            tmp = []
-            # Make sure we get a title and some skills from each profile
+            tmp_skills = []
+            # Make sure we get skill some skills from the profile and there are more than min_skill_length skills
             try:
-                tmp.extend([skill["name"] for skill in profile["skills"]])
+                tmp_skills.extend([skill["name"] for skill in profile["skills"]])
             except KeyError:
                 continue
+            if len(tmp_skills) < min_skill_length:
+                continue
+            # Make sure we get a title from the profile
             try:
                 titles.append(profile["experience"][0]["title"]["name"])
             except (KeyError, IndexError):
                 continue
-            # Hyperparameter tuning
-            if len(tmp) < min_skill_length:
-                continue
-            skills_flat.extend(tmp)
-            skills_data.append(" ".join(tmp))
+            skills_flat.extend(tmp_skills)
+            skills_data.append(" ".join(tmp_skills))
         print()
         return titles, skills_data, skills_flat
 
