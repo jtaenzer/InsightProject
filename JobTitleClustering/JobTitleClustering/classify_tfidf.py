@@ -18,6 +18,7 @@ remake_transform = True
 min_skill_freq = 10000
 min_title_freq = 1000
 min_skill_length = 5
+train_test_frac = 0.5
 titles_to_remove = ["owner", "president", "ceo", "manager", "founder", "supervisor", "business owner", "intern", "co-founder", "président", "propriétaire"]
 save_path = "D:/FutureFit/classifying_tfidf_canada/skill_freq_{0}_skill_length_{1}_title_freq_{2}/"\
     .format(min_skill_freq, min_skill_length, min_title_freq)
@@ -26,7 +27,7 @@ save_path = "D:/FutureFit/classifying_tfidf_canada/skill_freq_{0}_skill_length_{
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
-if get_raw_data:
+if get_raw_data and clean_data:
     data_extractor = Pipeline("FutureFitAI_database", "talent_profiles")
     print("Retrieving data from DB")
     titles, data = data_extractor.get_all_skills(min_skill_length=min_skill_length)
@@ -37,8 +38,8 @@ if get_raw_data:
     print("Dumping data to binaries for later use")
     dump(data, save_path + "data_join.joblib")
     dump(titles, save_path + "titles_for_plotting.joblib")
-else:
-    print("Loading data from binaries")
+elif clean_data and not get_raw_data:
+    print("Loading raw data from binaries")
     data = load(save_path + "data_join.joblib")
     titles = load(save_path + "titles_for_plotting.joblib")
 
@@ -107,7 +108,7 @@ for title in titles_enc:
     data_str_dict[title] = []
 
 print("Splitting data by title")
-for index, row in enumerate(data_clean):
+for index, row in enumerate(data_clean_str):
     data_str_dict[titles_enc[index]].append(row)
 
 print("Splitting training and testing data")
@@ -120,11 +121,11 @@ for index, key in enumerate(data_str_dict):
     matrix = tfidf_transformer.transform(count_vectorizer.transform(data_str_dict[key])).toarray()
     matrix = matrix[np.sum(matrix, axis=1) != 0]
     np.random.shuffle(matrix)
-    data_training[key] = matrix[:int(matrix.shape[0]*0.5), :]
+    data_training[key] = matrix[:int(matrix.shape[0]*train_test_frac), :]
     titles_col = np.array([[key]*data_training[key].shape[0]]).reshape(-1, 1)
     data_training[key] = np.concatenate((data_training[key], titles_col), axis=1)
 
-    data_testing[key] = matrix[int(matrix.shape[0]*0.5):, :]
+    data_testing[key] = matrix[int(matrix.shape[0]*train_test_frac):, :]
     titles_col = np.array([[key]*data_testing[key].shape[0]]).reshape(-1, 1)
     data_testing[key] = np.concatenate((data_testing[key], titles_col), axis=1)
 print()
@@ -137,13 +138,13 @@ dump(data_testing_mat, save_path + "data_testing.joblib")
 print("Preparing model")
 X_train, y_train = data_training_mat[:, :-1], data_training_mat[:, -1]
 X_test, y_test = data_testing_mat[:, :-1], data_testing_mat[:, -1]
+print(X_train.shape)
+print(X_test.shape)
 scaler = StandardScaler()
 scaler.fit(X_train)
 dump(scaler, save_path + "scaler.joblib")
 X_train = scaler.transform(X_train)
-X_test = scaler.transform(X_test)
-print(X_train.shape)
-print(X_test.shape)
+#X_test = scaler.transform(X_test)
 mlp = MLPClassifier(hidden_layer_sizes=(X_train.shape[1], int((2/3)*X_train.shape[1]), len(labelenc.classes_)),
                     max_iter=1000, verbose=True)
 print("Fitting model")
@@ -151,3 +152,4 @@ mlp.fit(X_train, y_train)
 dump(mlp, save_path + "model.joblib")
 predictions = mlp.predict(X_test)
 print("accuracy score:", accuracy_score(y_test,predictions))
+
