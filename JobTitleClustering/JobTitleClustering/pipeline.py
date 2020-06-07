@@ -123,9 +123,12 @@ class Pipeline:
             if len(tmp_skills) < min_skill_length:
                 continue
             # Loop over the job title functions map and duplicate the skills data for each title
-            for title in profile["primary"]["job"]["title"]["functions"]:
-                self.titles_raw.append(title)
-                self.data_raw.append(tmp_skills)
+            try:
+                tmp_title = profile["primary"]["job"]["title"]["functions"][0]
+            except (KeyError, IndexError):
+                continue
+            self.titles_raw.append(tmp_title)
+            self.data_raw.append(tmp_skills)
             if len(self.titles_raw) != len(self.data_raw):
                 print("Pipeline.get_all_skills: len(titles) != len(skills_data), this should never happen.")
                 sys.exit(2)
@@ -151,7 +154,7 @@ class Pipeline:
         self.tfidf_transformer.fit(data)
         self.data_tfidf_matrix = self.tfidf_transformer.transform(data)
 
-    def drop_titles_from_data(self, titles_to_drop):
+    def drop_titles_from_data(self, titles_to_drop, title_depth=-1):
         if not titles_to_drop:
             self.titles_clean = pd.Series(self.titles_raw, dtype=str)
             self.data_clean = self.data_raw
@@ -162,6 +165,11 @@ class Pipeline:
         self.titles_clean = titles_series[mask]
         self.data_clean = self.clean_data_list_by_mask(mask, self.data_raw)
         self.cleaning_level["title_ignore_list"] = True
+        if title_depth > 0:
+            mask = self.titles_clean.isin(self.titles_clean.value_counts()[:title_depth].index)
+            self.titles_clean = self.titles_clean[mask]
+            self.data_clean = self.clean_data_list_by_mask(mask, self.data_clean)
+            self.cleaning_level["title_depth"] = True
 
     def drop_matrix_rows_by_sum(self, min_skill_length=5):
         mask = (np.sum(self.data_count_matrix, axis=1) >= min_skill_length).reshape(1, -1).tolist()[0]
