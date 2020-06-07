@@ -183,6 +183,8 @@ class Pipeline:
             dump(self.tfidf_transformer, self.binary_path + "tfidf_transformer.joblib")
         if self.data_tfidf_matrix.shape[0] > 0:
             dump(self.data_tfidf_matrix, self.binary_path + "data_tfidf_matrix.joblib")
+        if self.data_count_matrix.shape[0] > 0:
+            dump(self.data_count_matrix, self.binary_path + "data_count_matrix.joblib")
 
     def load_binaries(self):
         self.titles_clean = load(self.binary_path + "titles_clean.joblib")
@@ -190,6 +192,7 @@ class Pipeline:
         self.skills_vocabulary = load(self.binary_path + "skills_vocabulary.joblib")
         self.tfidf_transformer = load(self.binary_path + "tfidf_transformer.joblib")
         self.data_tfidf_matrix = load(self.binary_path + "data_tfidf_matrix.joblib")
+        self.data_count_matrix = load(self.binary_path + "data_count_matrix.joblib")
 
     def run_clustering_pipeline(self, min_skill_length=5, drop_titles=list(), skill_depth=10000, verbose=0):
         if verbose:
