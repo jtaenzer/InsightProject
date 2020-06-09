@@ -5,8 +5,8 @@ import configs.cluster_config as cfg
 from pipeline import Pipeline
 
 # Create the directory to save plots and models, if it doesn't exist already
-save_path = "D:/FutureFit/svd_exploration/skill_freq_{0}_skill_length_{1}_title_freq_{2}/"\
-    .format(cfg.min_skill_depth, cfg.min_skill_length, cfg.min_title_depth)
+save_path = "D:/FutureFit/clustering_tfidf_canada/skill_freq_{0}_skill_length_{1}_title_freq_{2}/"\
+    .format(cfg.min_skill_depth, cfg.min_skill_length, cfg.min_title_freq)
 if not os.path.exists(save_path):
     os.makedirs(save_path)
 
@@ -14,7 +14,7 @@ data_pipeline = Pipeline("FutureFitAI_database", "talent_profiles", binary_path=
 print("Getting raw data from the DB")
 data_pipeline.get_all_skills_primary(min_skill_length=cfg.min_skill_length)
 print("Dropping titles from bad title list from data")
-data_pipeline.drop_titles_from_data(cfg.titles_to_drop, title_depth=cfg.min_title_depth)
+data_pipeline.drop_titles_from_data(cfg.titles_to_drop, title_depth=cfg.min_title_freq)
 print("Preparing data for CountVectorizer and TfidfTransformer")
 data_pipeline.prepare_data_for_count_vectorizer(skill_depth=cfg.min_skill_depth)
 print("Tranforming with CountVectorizer")
