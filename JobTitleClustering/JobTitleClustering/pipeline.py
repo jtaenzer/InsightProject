@@ -128,9 +128,9 @@ class Pipeline:
     # Similiar to get_all_skills above but the job title is retrieved from the primary field
     def get_all_skills_primary(self, min_skill_length=5):
         conditions = {"$and": [{"skills": {"$exists": True, "$ne": []}},
-                               {"primary.job": {"$exists": True, "$ne": None}},
-                               {"primary.job.title.functions": {"$exists": True, "$ne": []}}]}
-        mask = {"_id": 0, "skills": 1, "primary.job.title.functions": 1}
+                               {"primary.job.title": {"$exists": True, "$ne": None}},
+                               {"primary.job.title.name": {"$exists": True, "$ne": None}}]}
+        mask = {"_id": 0, "skills": 1, "primary.job.title.name": 1}
         profiles = self.collection.find(conditions, mask)
         for index, profile in enumerate(profiles):
             # Build a list of skills for the profile, continue if it is too short
@@ -143,7 +143,7 @@ class Pipeline:
                 continue
             # Loop over the job title functions map and duplicate the skills data for each title
             try:
-                tmp_title = profile["primary"]["job"]["title"]["functions"][0]
+                tmp_title = profile["primary"]["job"]["title"]["name"]
             except (KeyError, IndexError):
                 continue
             self.titles_raw.append(tmp_title)
