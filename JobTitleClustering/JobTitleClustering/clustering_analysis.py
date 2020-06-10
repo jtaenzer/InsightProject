@@ -3,8 +3,11 @@ from joblib import load
 from wordcloud import WordCloud
 from matplotlib import pyplot as plt
 
-# Load our fitted clustering model and the data that went into the clustering
+
 path = "D:/FutureFit/tfidf_exploration/analysis_test_folder/"
+# How many clusters do we want to find?
+n_target_clusters = 4
+# Load our fitted clustering model and the data that went into the clustering
 clustering = load(path + "clustering_ward_euclidean.joblib")
 titles = load(path + "titles_clean.joblib")
 data = load(path + "data_clean.joblib")
@@ -47,8 +50,6 @@ for index, row in enumerate(children):
 clusters = list()
 clusters.append(children[children.shape[0] - 1][0])
 clusters.append(children[children.shape[0] - 1][1])
-# How many clusters do we want to find?
-n_target_clusters = 4
 # Unwind the clustering tree we build earlier until we arrive at n_target_clusters
 # Some caveats:
 # (1) Because we generally don't want to see singletons or "small" clusters, they are dropped
@@ -77,7 +78,7 @@ while len(clusters) < n_target_clusters:
     clusters = tmp_clusters
 
 # Generate word clouds of the titles and skills from the clusters we collected above!
-for index, cluster in enumerate(clusters):
+for cluster in clusters:
     print("Plotting cluster {}".format(cluster))
     titles_ser = pd.Series(clustering_tree[cluster]["child_titles"], dtype=str)
     wordcloud = WordCloud(width=800, height=800,
