@@ -4,9 +4,11 @@ from wordcloud import WordCloud
 from matplotlib import pyplot as plt
 
 
-path = "D:/FutureFit/tfidf_exploration/analysis_test_folder/"
+path = "./analysis_test_folder/"
 # How many clusters do we want to find?
 n_target_clusters = 4
+# Do we want to ignore small clusters?
+min_clus_size = 10
 # Load our fitted clustering model and the data that went into the clustering
 clustering = load(path + "clustering_ward_euclidean.joblib")
 titles = load(path + "titles_clean.joblib")
@@ -66,9 +68,9 @@ while len(clusters) < n_target_clusters:
         left = children[cluster - children.shape[0] - 1][0]
         right = children[cluster - children.shape[0] - 1][1]
         # Drop singletons and small clusters
-        if left > children.shape[0] and len(clustering_tree[left]["child_indices"]) > 10:
+        if left > children.shape[0] and len(clustering_tree[left]["child_indices"]) > min_clus_size:
             tmp_clusters.append(left)
-        if right > children.shape[0] and len(clustering_tree[right]["child_indices"]) > 10:
+        if right > children.shape[0] and len(clustering_tree[right]["child_indices"]) > min_clus_size:
             tmp_clusters.append(right)
         # If we exceeded n_target_clusters in this loop, remove left/right and re-append the parent cluster
         # This should lead to equality and the while loop will end
