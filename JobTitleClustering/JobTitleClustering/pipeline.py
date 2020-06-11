@@ -5,8 +5,10 @@ import numpy as np
 import pandas as pd
 from pymongo import MongoClient
 from joblib import dump, load
+from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.preprocessing import StandardScaler
 
 """
 pipeline.py 
@@ -46,6 +48,9 @@ class Pipeline:
         self.data_count_matrix = None
         self.tfidf_transformer = None
         self.data_tfidf_matrix = None
+        self.label_encoder = None
+        self.titles_encoded = list()
+        self.scaler = None
 
     # Creates a list strings where each string contains the skills from a profile in the DB
     # Deprecated in favour of get_all_skills_primary
@@ -223,7 +228,6 @@ class Pipeline:
             return
         # Remove titles in the titles_to_drop list from the titles/data
         mask = ~self.titles_clean.isin(titles_to_drop)
-        print(len(mask))
         self.titles_clean = self.titles_clean[mask]
         self.data_clean = self.clean_data_list_by_mask(mask, self.data_clean)
         self.cleaning_level["title_ignore_list"] = True
@@ -255,10 +259,20 @@ class Pipeline:
 
     # Initialize the TfidfTransformer and fit_transform the count matrix created by setup_count_vectorizer_and_transform
     # Calling these methods out of order will not work! Add protections
+    # Data is taken as an input of relying on class variables so this can be used for both encoded and string data
     def setup_tfidf_transformer_and_fit_transform(self, data):
         self.tfidf_transformer = TfidfTransformer()
         self.tfidf_transformer.fit(data)
         self.data_tfidf_matrix = self.tfidf_transformer.transform(data)
+
+    def setup_label_encoded_and_fit_transform(self):
+        self.label_encoder = LabelEncoder()
+        self.titles_encoded = self.label_encoder.fit_transform(self.titles_clean)
+
+    def setup_standard_scaler_and_fit_transform(self, training_data):
+        self.scaler = StandardScaler()
+        training_data_scaled = self.scaler.fit_transform(training_data)
+        return training_data_scaled
 
     # Drop rows from our matrices and data/titles lists that don't have a row sum > min_skill_length in the count matrix
     # Likely the data was already filtered by some min_skill_length during the DB extraction
@@ -278,6 +292,8 @@ class Pipeline:
     # Dump class vars to binaries for later use
     # Mostly exists for cases where a partial pre-pocessing needs to be re-started from some interim step
     def dump_binaries(self):
+        # This function needs serious improvement
+        # Many of these if statements will throw errors if the class vars are left as None
         if not os.path.exists(self.binary_path):
             os.makedirs(self.binary_path)
         if len(self.titles_clean) > 0:
@@ -293,9 +309,16 @@ class Pipeline:
             dump(self.data_tfidf_matrix, self.binary_path + "data_tfidf_matrix.joblib")
         if self.data_count_matrix.shape[0] > 0:
             dump(self.data_count_matrix, self.binary_path + "data_count_matrix.joblib")
+        if self.label_encoder:
+            dump(self.label_encoder, self.binary_path + "label_encoder.joblib")
+        if len(self.titles_encoded) > 0:
+            dump(self.titles_encoded, self.binary_path + "titles_encoded.joblib")
+        if self.scaler:
+            dump(self.scaler, self.binary_path + "scaler.joblib")
 
     # Load existing binaries into class vars
-    def load_binaries(self):
+    # classify_mode=True loads additional binaries needed for classifying/interpreting classification model output
+    def load_binaries(self, classify_mode=False):
         self.titles_clean = load(self.binary_path + "titles_clean.joblib")
         self.data_clean = load(self.binary_path + "data_clean.joblib")
         self.cleaning_level = load(self.binary_path + "cleaning_level_dict.joblib")
@@ -303,6 +326,10 @@ class Pipeline:
         self.tfidf_transformer = load(self.binary_path + "tfidf_transformer.joblib")
         self.data_tfidf_matrix = load(self.binary_path + "data_tfidf_matrix.joblib")
         self.data_count_matrix = load(self.binary_path + "data_count_matrix.joblib")
+        if classify_mode:
+            self.label_encoder = load(self.binary_path + "label_encoder.joblib")
+            self.titles_encoded = load(self.binary_path + "titles_encoded.joblib")
+            self.scaler = load(self.binary_path + "scaler.joblib")
 
     # Run the full clustering pipeline in order
     def run_clustering_pipeline(self, min_skill_length=5, drop_titles=list(), skill_depth=10000, min_title_freq=3, verbose=0):
