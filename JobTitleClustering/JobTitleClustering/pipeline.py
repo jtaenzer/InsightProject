@@ -303,6 +303,8 @@ class Pipeline:
             dump(self.cleaning_level, self.binary_path + "cleaning_level_dict.joblib")
         if self.skills_vocabulary:
             dump(self.skills_vocabulary, self.binary_path + "skills_vocabulary.joblib")
+        if self.count_vectorizer:
+            dump(self.count_vectorizer, self.binary_path + "count_vectorizer.joblib")
         if self.tfidf_transformer:
             dump(self.tfidf_transformer, self.binary_path + "tfidf_transformer.joblib")
         if self.data_tfidf_matrix.shape[0] > 0:
