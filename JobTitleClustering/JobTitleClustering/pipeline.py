@@ -21,7 +21,7 @@ The full pipeline for clustering can be run via run_clustering_pipeline
 
 
 class Pipeline:
-    def __init__(self, db_name, collection_name, client_url="mongodb://localhost:27017/", binary_path=""):
+    def __init__(self, db_name, collection_name, client_url="mongodb://siteRootAdmin:passw0rd@15.223.134.69:27017/", binary_path=""):
         self.client = MongoClient(client_url)
         # Consider adding some protections against bad input
         self.db = self.client[db_name]
