@@ -21,7 +21,7 @@ The full pipeline for clustering can be run via run_clustering_pipeline
 
 
 class Pipeline:
-    def __init__(self, db_name, collection_name, client_url="mongodb://siteRootAdmin:passw0rd@15.223.134.69:27017/", binary_path=""):
+    def __init__(self, db_name, collection_name, client_url="mongodb://localhost:27017/", binary_path=""):
         self.client = MongoClient(client_url)
         # Consider adding some protections against bad input
         self.db = self.client[db_name]
@@ -84,6 +84,7 @@ class Pipeline:
 
     # Similar to get_all_skills but allows filtering by known job titles
     # Current job title filtering is simple: Find job titles starting with strings in the titles list using regex
+    # This should only be used for exploratory analysis
     def get_skills_by_titles(self, titles_to_extract, min_skill_length=5, n_profiles=0):
         if not titles_to_extract:
             return
@@ -179,6 +180,52 @@ class Pipeline:
             titles.append(title)
         print()
         return titles
+
+    # Get all profiles from the DB with a "clean_title" field and len(skills) > min_skill_length
+    # Intended to be used as input to get_all_skills_subsample
+    def get_all_clean_titles(self, min_skill_length=5, min_title_freq=5, drop_list=[]):
+        conditions = {"$and": [{"skills.{}".format(min_skill_length-1): {"$exists": True}},
+                               {"clean_title": {"$ne": None}}]}
+        mask = {"_id": 0, "clean_title": 1}
+        profiles = self.collection.find(conditions, mask)
+        titles = []
+        for index, profile in enumerate(profiles):
+            if any(drop in profile["clean_title"] for drop in drop_list):
+                continue
+            titles.append(profile["clean_title"])
+        titles = pd.Series(titles, dtype=str)
+        titles = titles[titles.isin(titles.value_counts()[titles.value_counts() > min_title_freq].index)]
+        return titles.drop_duplicates().tolist()
+
+    # Subsample the DB based on titles
+    def get_all_skills_subsample(self, titles, min_skill_length=5, min_title_freq=5, sample_depth=200):
+        if not titles:
+            return
+        for title in titles:
+            pipeline = [{"$match": {"clean_title": {"$eq": title},
+                                    "skills.{}".format(min_skill_length-1): {"$exists": True}}},
+                        {"$sample": {"size": sample_depth}}]
+            profiles = self.collection.aggregate(pipeline)
+            for index, profile in enumerate(profiles):
+                try:
+                    tmp_skills = [skill["name"] for skill in profile["skills"]]
+                except KeyError:
+                    continue
+                try:
+                    tmp_title = profile["clean_title"]
+                except KeyError:
+                    continue
+                self.titles_raw.append(tmp_title)
+                self.data_raw.append(tmp_skills)
+
+        titles_ser = pd.Series(self.titles_raw, dtype=str)
+        mask = titles_ser.isin(titles_ser.value_counts()[titles_ser.value_counts() > min_title_freq].index)
+        self.titles_clean = titles_ser[mask]
+        self.data_clean = self.clean_data_list_by_mask(mask, self.data_raw)
+
+        if len(self.titles_clean) != len(self.data_clean):
+            print("Pipeline.get_all_skills: len(titles) != len(skills_data), this should never happen.")
+            sys.exit(2)
 
     # Similar to get_all_titles above but for use on the version of the DB containing more information
     def get_all_titles_deepDB(self, titles_to_drop, min_skill_length=5):
