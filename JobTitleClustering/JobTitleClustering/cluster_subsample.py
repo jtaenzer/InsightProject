@@ -4,6 +4,7 @@ from sklearn.cluster import AgglomerativeClustering
 import configs.cluster_config as cfg
 from pipeline import Pipeline
 
+from random import sample
 import pandas as pd
 import numpy as np
 
@@ -36,19 +37,19 @@ for index, row in enumerate(data_pipeline.data_clean):
     data_by_title_dict[data_pipeline.titles_encoded[index]].append(row)
 
 data_subsampled = dict()
+data_subsampled_matrices = dict()
 for index, key in enumerate(data_by_title_dict):
-    matrix = data_pipeline.count_vectorizer.transform(data_by_title_dict[key]).toarray()
+    data_subsampled[key] = sample(data_by_title_dict[key], cfg.subsample_depth)
+    matrix = data_pipeline.count_vectorizer.transform(data_subsampled[key]).toarray()
     matrix = matrix[np.sum(matrix, axis=1) > cfg.min_skill_length]
-    np.random.shuffle(matrix)
     matrix = data_pipeline.tfidf_transformer.transform(matrix).toarray()
-    data_subsampled[key] = matrix[:cfg.subsample_depth,:]
     titles_col = np.array([[key]*data_subsampled[key].shape[0]]).reshape(-1, 1)
-    data_subsampled[key] = np.concatenate((data_subsampled[key], titles_col), axis=1)
+    data_subsampled_matrices[key] = np.concatenate((matrix, titles_col), axis=1)
 
-data_subsampled_matrix = np.concatenate([data_subsampled[key] for key in data_subsampled.keys()], axis=0)
-titles_subsampled = data_subsampled_matrix[:,-1]
+data_subsampled_matrix = np.concatenate([data_subsampled_matrices[key] for key in data_subsampled_matrices.keys()], axis=0)
+titles_subsampled = data_subsampled_matrix[:, -1]
 dump(titles_subsampled, cfg.binary_path + "titles_subsampled.joblib")
-
+dump(data_subsampled, cfg.binary_path + "data_subsamples.joblib")
 
 print("Dumping binaries")
 data_pipeline.dump_binaries()
@@ -58,5 +59,5 @@ print("Clustering")
 print(data_subsampled_matrix.shape)
 # Create and fit the model, dump output to a pickle in case we need it later
 model = AgglomerativeClustering(affinity=cfg.affinity, linkage=cfg.linkage, n_clusters=cfg.n_cluster_stop)
-clustering = model.fit(data_subsampled_matrix[:,:-1])
+clustering = model.fit(data_subsampled_matrix[:, :-1])
 dump(model, cfg.binary_path + "clustering_model.joblib")
