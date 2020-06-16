@@ -43,7 +43,7 @@ for index, key in enumerate(data_by_title_dict):
     matrix = data_pipeline.count_vectorizer.transform(data_subsampled[key]).toarray()
     matrix = matrix[np.sum(matrix, axis=1) > cfg.min_skill_length]
     matrix = data_pipeline.tfidf_transformer.transform(matrix).toarray()
-    titles_col = np.array([[key]*data_subsampled[key].shape[0]]).reshape(-1, 1)
+    titles_col = np.array([[key]*matrix.shape[0]]).reshape(-1, 1)
     data_subsampled_matrices[key] = np.concatenate((matrix, titles_col), axis=1)
 
 data_subsampled_matrix = np.concatenate([data_subsampled_matrices[key] for key in data_subsampled_matrices.keys()], axis=0)
