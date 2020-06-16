@@ -64,7 +64,10 @@ for index, key in enumerate(data_by_title_dict):
     titles_col = np.array([[key]*data_subsampled[key].shape[0]]).reshape(-1, 1)
     data_subsampled[key] = np.concatenate((data_subsampled[key], titles_col), axis=1)
 
-data_training_mat = np.concatenate([data_subsampled[key] for key in data_subsampled.keys()], axis=0)
+data_subsampled_matrix = np.concatenate([data_subsampled[key] for key in data_subsampled.keys()], axis=0)
+titles_subsampled = data_subsampled_matrix[:,:-1]
+dump(titles_subsampled, cfg.binary_path + "titles_subsampled")
+
 
 print("Dumping binaries")
 data_pipeline.dump_binaries()
@@ -73,5 +76,5 @@ print("Pipeline complete!")
 print("Clustering")
 # Create and fit the model, dump output to a pickle in case we need it later
 model = AgglomerativeClustering(affinity=cfg.affinity, linkage=cfg.linkage, n_clusters=cfg.n_cluster_stop)
-clustering = model.fit(data_pipeline.data_tfidf_matrix)
-dump(model, save_path + "clustering_model.joblib")
+clustering = model.fit(data_subsampled_matrix)
+dump(model, cfg.binary_path + "clustering_model.joblib")
