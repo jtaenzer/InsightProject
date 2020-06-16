@@ -39,7 +39,10 @@ for index, row in enumerate(data_pipeline.data_clean):
 data_subsampled = dict()
 data_subsampled_matrices = dict()
 for index, key in enumerate(data_by_title_dict):
-    data_subsampled[key] = sample(data_by_title_dict[key], cfg.subsample_depth)
+    if len(data_by_title_dict[key]) > cfg.subsample_depth:
+        data_subsampled[key] = sample(data_by_title_dict[key], cfg.subsample_depth)
+    else:
+        data_subsampled[key] = data_by_title_dict[key]
     matrix = data_pipeline.count_vectorizer.transform(data_subsampled[key]).toarray()
     matrix = matrix[np.sum(matrix, axis=1) > cfg.min_skill_length]
     matrix = data_pipeline.tfidf_transformer.transform(matrix).toarray()
