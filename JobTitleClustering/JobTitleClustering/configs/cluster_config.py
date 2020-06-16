@@ -1,6 +1,6 @@
 # DB settings
 database_name = "FutureFitAI_database"
-collection_name = "talent_profiles"
+collection_name = "talent_profiles_CAN"
 
 # Where to dump binaries, leave as empty string if you don't want to save them
 binary_path = ""
@@ -13,6 +13,8 @@ min_skill_depth = 5000
 min_title_freq = 5
 # Minimum number of skills a profile has to contain to included in the data
 min_skill_length = 10
+# Subsample depth -- only used by cluster_subsample.py
+subsample_depth = 200
 # Number of clusters to stop the clustering at
 n_cluster_stop = 1
 # Distance measure to use, other options are "cosine", "l1", "cityblock" -- euclidean works best in small scale tests

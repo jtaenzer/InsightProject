@@ -183,19 +183,21 @@ class Pipeline:
 
     # Get all profiles from the DB with a "clean_title" field and len(skills) > min_skill_length
     # Intended to be used as input to get_all_skills_subsample
-    def get_all_clean_titles(self, min_skill_length=5, min_title_freq=5, drop_list=[]):
+    def get_all_skills_clean_titles(self, min_skill_length=5, drop_list=[]):
         conditions = {"$and": [{"skills.{}".format(min_skill_length-1): {"$exists": True}},
                                {"clean_title": {"$ne": None}}]}
-        mask = {"_id": 0, "clean_title": 1}
+        mask = {"_id": 0, "skills": 1, "clean_title": 1}
         profiles = self.collection.find(conditions, mask)
         titles = []
         for index, profile in enumerate(profiles):
             if any(drop in profile["clean_title"] for drop in drop_list):
                 continue
-            titles.append(profile["clean_title"])
-        titles = pd.Series(titles, dtype=str)
-        titles = titles[titles.isin(titles.value_counts()[titles.value_counts() > min_title_freq].index)]
-        return titles.drop_duplicates().tolist()
+            self.titles_raw.append(profile["clean_title"])
+            self.data_raw.append([skill["name"] for skill in profile["skills"]])
+
+        if len(self.titles_clean) != len(self.data_clean):
+            print("Pipeline.get_all_skills: len(titles) != len(skills_data), this should never happen.")
+            sys.exit(2)
 
     # Subsample the DB based on titles
     def get_all_skills_subsample(self, titles, min_skill_length=5, min_title_freq=5, sample_depth=200):
@@ -312,7 +314,7 @@ class Pipeline:
         self.tfidf_transformer.fit(data)
         self.data_tfidf_matrix = self.tfidf_transformer.transform(data)
 
-    def setup_label_encoded_and_fit_transform(self):
+    def setup_label_encoder_and_fit_transform(self):
         self.label_encoder = LabelEncoder()
         self.titles_encoded = self.label_encoder.fit_transform(self.titles_clean)
 
