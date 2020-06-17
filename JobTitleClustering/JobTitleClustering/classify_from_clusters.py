@@ -25,6 +25,16 @@ data_dict = load(binary_path + "data_subsampled.joblib")
 count_vectorizer = load(binary_path + "count_vectorizer.joblib")
 tfidf_transformer = load(binary_path + "tfidf_transformer.joblib")
 
+# Rebuild the tfidf transformed matrix
+print("Rebuilding clustering input")
+mat_list = list()
+for key in data_dict.keys():
+    cluster_matrix = count_vectorizer.transform(data_dict[key]).toarray()
+    cluster_matrix = cluster_matrix[np.sum(cluster_matrix, axis=1) > 10]
+    cluster_matrix = tfidf_transformer.transform(cluster_matrix).toarray()
+    mat_list.append(cluster_matrix)
+data_tfidf_matrix = np.concatenate([mat for mat in mat_list], axis=0)
+
 print("Getting core skills")
 # Create and dump core_skills_dict
 core_skills_dict = dict()
@@ -106,10 +116,7 @@ for cluster in pure_clusters:
     titles_ser = pd.Series(clustering_tree[cluster]["child_titles"], dtype=str)
     cluster_label_enc = title_encoding.index(titles_ser.value_counts().index[0])
     # Matrix
-    cluster_matrix = count_vectorizer.transform(data_dict[cluster_label_enc]).toarray()
-    mask = np.sum(cluster_matrix, axis=1) > 10
-    cluster_matrix = cluster_matrix[mask]
-    cluster_matrix = tfidf_transformer.transform(cluster_matrix).toarray()
+    cluster_matrix = data_tfidf_matrix[clustering_tree[cluster]["child_indices"]]
     output_column = np.array([[cluster_label_enc]*cluster_matrix.shape[0]]).reshape(-1, 1)
     training_data_list.append(np.concatenate((cluster_matrix, output_column), axis=1))
 
@@ -126,4 +133,3 @@ mlp = MLPClassifier(hidden_layer_sizes=(X_train.shape[1], int((2/3)*X_train.shap
 
 mlp.fit(X_train, y_train)
 dump(mlp, binary_path + "MLPClassifier_model.joblib")
-
