@@ -5,7 +5,7 @@ from joblib import dump, load
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 
-binary_path = "D:/FutureFit/clustering_tfidf_canada/subsampled_120kprofiles/binaries/"
+binary_path = "./binaries"
 # How many clusters do we want to find?
 n_target_clusters = 300
 # Do we want to ignore small clusters?
@@ -14,6 +14,8 @@ min_clus_size = 200
 min_purity = 10
 # Depth in skills list to be considered core skills
 core_skills_depth = 10
+# Train/test frac
+train_test_frac = 0.8
 
 # Load binaries
 clustering = load(binary_path + "clustering_model.joblib")
@@ -118,7 +120,9 @@ for cluster in pure_clusters:
     # Matrix
     cluster_matrix = data_tfidf_matrix[clustering_tree[cluster]["child_indices"]]
     output_column = np.array([[cluster_label_enc]*cluster_matrix.shape[0]]).reshape(-1, 1)
-    training_data_list.append(np.concatenate((cluster_matrix, output_column), axis=1))
+    cluster_matrix = np.concatenate((cluster_matrix, output_column), axis=1)
+    np.random.shuffle(cluster_matrix)
+    training_data_list.append(cluster_matrix[:int(train_test_frac*cluster_matrix.shape[0]), :])
 
 training_data_matrix = np.concatenate([matrix for matrix in training_data_list], axis=0)
 np.random.shuffle(training_data_matrix)
