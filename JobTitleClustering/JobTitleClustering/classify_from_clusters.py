@@ -121,6 +121,7 @@ for cluster in pure_clusters:
     training_data_list.append(np.concatenate((cluster_matrix, output_column), axis=1))
 
 training_data_matrix = np.concatenate([matrix for matrix in training_data_list], axis=0)
+np.random.shuffle(training_data_matrix)
 X_train, y_train = training_data_matrix[:, :-1], training_data_matrix[:, -1]
 
 scaler = StandardScaler()
