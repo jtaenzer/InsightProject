@@ -5,7 +5,7 @@ from joblib import dump, load
 from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
 
-binary_path = "./binaries"
+binary_path = "./binaries/"
 # How many clusters do we want to find?
 n_target_clusters = 300
 # Do we want to ignore small clusters?
