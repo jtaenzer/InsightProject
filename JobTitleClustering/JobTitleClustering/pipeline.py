@@ -345,27 +345,17 @@ class Pipeline:
         # Many of these if statements will throw errors if the class vars are left as None
         if not os.path.exists(self.binary_path):
             os.makedirs(self.binary_path)
-        if len(self.titles_clean) > 0:
-            dump(self.titles_clean, self.binary_path + "titles_clean.joblib")
-        if self.data_clean:
-            dump(self.data_clean, self.binary_path + "data_clean.joblib")
-            dump(self.cleaning_level, self.binary_path + "cleaning_level_dict.joblib")
-        if self.skills_vocabulary:
-            dump(self.skills_vocabulary, self.binary_path + "skills_vocabulary.joblib")
-        if self.count_vectorizer:
-            dump(self.count_vectorizer, self.binary_path + "count_vectorizer.joblib")
-        if self.tfidf_transformer:
-            dump(self.tfidf_transformer, self.binary_path + "tfidf_transformer.joblib")
-        if self.data_tfidf_matrix.shape[0] > 0:
-            dump(self.data_tfidf_matrix, self.binary_path + "data_tfidf_matrix.joblib")
-        if self.data_count_matrix.shape[0] > 0:
-            dump(self.data_count_matrix, self.binary_path + "data_count_matrix.joblib")
-        if self.label_encoder:
-            dump(self.label_encoder, self.binary_path + "label_encoder.joblib")
-        if len(self.titles_encoded) > 0:
-            dump(self.titles_encoded, self.binary_path + "titles_encoded.joblib")
-        if self.scaler:
-            dump(self.scaler, self.binary_path + "scaler.joblib")
+        dump(self.titles_clean, self.binary_path + "titles_clean.joblib")
+        dump(self.data_clean, self.binary_path + "data_clean.joblib")
+        dump(self.cleaning_level, self.binary_path + "cleaning_level_dict.joblib")
+        dump(self.skills_vocabulary, self.binary_path + "skills_vocabulary.joblib")
+        dump(self.count_vectorizer, self.binary_path + "count_vectorizer.joblib")
+        dump(self.tfidf_transformer, self.binary_path + "tfidf_transformer.joblib")
+        dump(self.data_tfidf_matrix, self.binary_path + "data_tfidf_matrix.joblib")
+        dump(self.data_count_matrix, self.binary_path + "data_count_matrix.joblib")
+        dump(self.label_encoder, self.binary_path + "label_encoder.joblib")
+        dump(self.titles_encoded, self.binary_path + "titles_encoded.joblib")
+        dump(self.scaler, self.binary_path + "scaler.joblib")
 
     # Load existing binaries into class vars
     # classify_mode=True loads additional binaries needed for classifying/interpreting classification model output
