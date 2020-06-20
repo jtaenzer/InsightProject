@@ -4,6 +4,7 @@ import bson
 import numpy as np
 import pandas as pd
 from pymongo import MongoClient
+from random import sample
 from joblib import dump, load
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer
@@ -35,6 +36,11 @@ class Pipeline:
 
         self.data_clean = list()
         self.titles_clean = list()
+        self.titles_encoded = list()
+
+        self.data_subsampled = dict()
+        self.titles_subsampled = list()
+
         # Used to keep track of the cleaning steps applied to the data
         self.cleaning_level = {"title_ignore_list": False,
                                "title_freq": False,
@@ -49,38 +55,38 @@ class Pipeline:
         self.tfidf_transformer = None
         self.data_tfidf_matrix = None
         self.label_encoder = None
-        self.titles_encoded = list()
         self.scaler = None
 
-    # Creates a list strings where each string contains the skills from a profile in the DB
-    # Deprecated in favour of get_all_skills_primary
-    def get_all_skills(self, min_skill_length=5):
-        conditions = {"$and": [{"skills": {"$exists": True, "$ne": []}},
-                               {"experience.title": {"$exists": True, "$ne": []}},
-                               {"primary.job.title": {"$exists": True, "$ne": None}}]}
-        mask = {"_id": 0, "skills": 1, "experience.is_primary": 1, "experience.title.name": 1}
-        skills = []
+    # Get all titles in the flat DB, primarily used for the title analysis script
+    # Conditions and mask may have to be modified based on DB structure
+    def get_all_titles(self, drop_list=[]):
+        conditions = {"clean_title": {"$exists": True, "$ne": None}}
+        mask = {"_id": 0, "clean_title": 1}
+        profiles = self.collection.find(conditions, mask)
         titles = []
+        for index, profile in enumerate(profiles):
+            if any(drop in profile["clean_title"] for drop in drop_list):
+                continue
+            titles.append(profile["clean_title"])
+        return titles
+
+    # Get job titles and skills from the DB
+    # Titles can be filtered using drop list
+    # Conditions and mask may have to be modified based on DB structure
+    def get_titles_and_skills_data(self, min_skill_length=5, drop_list=[]):
+        conditions = {"$and": [{"skills.{}".format(min_skill_length-1): {"$exists": True}},
+                               {"clean_title": {"$exists": True, "$ne": None}}]}
+        mask = {"_id": 0, "skills": 1, "clean_title": 1}
         profiles = self.collection.find(conditions, mask)
         for index, profile in enumerate(profiles):
-            # Make sure we get skill some skills from the profile and there are more than min_skill_length skills
-            tmp_skills = []
-            try:
-                tmp_skills.extend([skill["name"] for skill in profile["skills"]])
-            except KeyError:
+            if index > 100: break
+            if any(drop in profile["clean_title"] for drop in drop_list):
                 continue
-            if len(tmp_skills) < min_skill_length:
-                continue
-            # Make sure we get a title from the profile
-            try:
-                titles.append(profile["experience"][0]["title"]["name"])
-            except (KeyError, IndexError):
-                continue
-            skills.append(tmp_skills)
-        if len(titles) != len(skills):
-            print("Pipeline.get_all_skills: len(titles) != len(skills_data), this should never happen.")
+            self.titles_raw.append(profile["clean_title"])
+            self.data_raw.append([skill["name"] for skill in profile["skills"]])
+        if len(self.titles_clean) != len(self.data_clean):
+            print("Pipeline.get_titles_and_skills_data : len(titles) != len(skills_data), this should never happen.")
             sys.exit(2)
-        return titles, skills
 
     # Similar to get_all_skills but allows filtering by known job titles
     # Current job title filtering is simple: Find job titles starting with strings in the titles list using regex
@@ -93,7 +99,7 @@ class Pipeline:
         # Build a list of regex expressions to use in the conditions dictionary for the DB query
         regx_exprs = [bson.regex.Regex("^{}".format(title)) for title in titles_to_extract]
         conditions = {"$and": [{"skills": {"$exists": True, "$ne": []}},
-                               {"primary.job": {"$exists": True, "$ne": None}},
+                               {"primary.job.title.name": {"$exists": True, "$ne": None}},
                                {"primary.job.title.functions": {"$exists": True, "$ne": []}}]}
         or_list = []
         for regx_expr in regx_exprs:
@@ -137,126 +143,6 @@ class Pipeline:
             print("Pipeline.get_skills_by_titles: len(titles) != len(skills_data), this should never happen.")
             sys.exit(2)
 
-    # Similar to get_all_skills above but the job title is retrieved from the primary field
-    def get_all_skills_primary(self, min_skill_length=5):
-        conditions = {"$and": [{"skills": {"$exists": True, "$ne": []}},
-                               {"primary.job.title": {"$exists": True, "$ne": None}},
-                               {"primary.job.title.name": {"$exists": True, "$ne": None}}]}
-        mask = {"_id": 0, "skills": 1, "primary.job.title.name": 1}
-        profiles = self.collection.find(conditions, mask)
-        for index, profile in enumerate(profiles):
-            # Build a list of skills for the profile, continue if it is too short
-            tmp_skills = list()
-            try:
-                tmp_skills.extend([skill["name"] for skill in profile["skills"]])
-            except KeyError:
-                continue
-            if len(tmp_skills) < min_skill_length:
-                continue
-            # Loop over the job title functions map and duplicate the skills data for each title
-            try:
-                tmp_title = profile["primary"]["job"]["title"]["name"]
-            except (KeyError, IndexError):
-                continue
-            self.titles_raw.append(tmp_title)
-            self.data_raw.append(tmp_skills)
-        if len(self.titles_raw) != len(self.data_raw):
-            print("Pipeline.get_all_skills: len(titles) != len(skills_data), this should never happen.")
-            sys.exit(2)
-
-    # Get all titles in the flat DB, primarily used for the title analysis script
-    def get_all_titles(self, titles_to_drop):
-        conditions = {}
-        mask = {"_id": 0, "job_title": 1}
-        profiles = self.collection.find(conditions, mask)
-        titles = []
-        for index, profile in enumerate(profiles):
-            if index % 10000 == 0:
-                sys.stdout.write("\r")
-                sys.stdout.write("{:2.0f}".format(float(index / 20500000) * 100) + "%")
-            title = profile["job_title"]
-            if title in titles_to_drop:
-                continue
-            titles.append(title)
-        print()
-        return titles
-
-    # Get all profiles from the DB with a "clean_title" field and len(skills) > min_skill_length
-    # Intended to be used as input to get_all_skills_subsample
-    def get_all_skills_clean_titles(self, min_skill_length=5, drop_list=[]):
-        conditions = {"$and": [{"skills.{}".format(min_skill_length-1): {"$exists": True}},
-                               {"clean_title": {"$ne": None}}]}
-        mask = {"_id": 0, "skills": 1, "clean_title": 1}
-        profiles = self.collection.find(conditions, mask)
-        titles = []
-        for index, profile in enumerate(profiles):
-            if any(drop in profile["clean_title"] for drop in drop_list):
-                continue
-            self.titles_raw.append(profile["clean_title"])
-            self.data_raw.append([skill["name"] for skill in profile["skills"]])
-
-        if len(self.titles_clean) != len(self.data_clean):
-            print("Pipeline.get_all_skills: len(titles) != len(skills_data), this should never happen.")
-            sys.exit(2)
-
-    # Subsample the DB based on titles
-    def get_all_skills_subsample(self, titles, min_skill_length=5, min_title_freq=5, sample_depth=200):
-        if not titles:
-            return
-        for title in titles:
-            pipeline = [{"$match": {"clean_title": {"$eq": title},
-                                    "skills.{}".format(min_skill_length-1): {"$exists": True}}},
-                        {"$sample": {"size": sample_depth}}]
-            profiles = self.collection.aggregate(pipeline)
-            for index, profile in enumerate(profiles):
-                try:
-                    tmp_skills = [skill["name"] for skill in profile["skills"]]
-                except KeyError:
-                    continue
-                try:
-                    tmp_title = profile["clean_title"]
-                except KeyError:
-                    continue
-                self.titles_raw.append(tmp_title)
-                self.data_raw.append(tmp_skills)
-
-        titles_ser = pd.Series(self.titles_raw, dtype=str)
-        mask = titles_ser.isin(titles_ser.value_counts()[titles_ser.value_counts() > min_title_freq].index)
-        self.titles_clean = titles_ser[mask]
-        self.data_clean = self.clean_data_list_by_mask(mask, self.data_raw)
-
-        if len(self.titles_clean) != len(self.data_clean):
-            print("Pipeline.get_all_skills: len(titles) != len(skills_data), this should never happen.")
-            sys.exit(2)
-
-    # Similar to get_all_titles above but for use on the version of the DB containing more information
-    def get_all_titles_deepDB(self, titles_to_drop, min_skill_length=5):
-        conditions = {"$and": [{"skills": {"$exists": True, "$ne": []}},
-                               {"primary.job.title": {"$exists": True, "$ne": None}}]}
-        mask = {"_id": 0, "skills": 1, "primary.job.title.name": 1}
-        profiles = self.collection.find(conditions, mask)
-        titles = []
-        for index, profile in enumerate(profiles):
-            if index % 10000 == 0:
-                sys.stdout.write("\r")
-                sys.stdout.write("{:2.0f}".format(float(index / 3500000) * 100) + "%")
-            tmp_skills = list()
-            try:
-                tmp_skills.extend([skill["name"] for skill in profile["skills"]])
-            except KeyError:
-                continue
-            if len(tmp_skills) < min_skill_length:
-                continue
-            try:
-                tmp_title = profile["primary"]["job"]["title"]["name"]
-            except KeyError:
-                continue
-            if tmp_title in titles_to_drop:
-                continue
-            titles.append(tmp_title)
-        print()
-        return titles
-
     # Clean the data / titles based on
     # (1) An input list of titles to drop
     # (2) Removal of "tails" based on some minimum frequency
@@ -272,7 +158,7 @@ class Pipeline:
             self.titles_clean = self.titles_clean[mask]
             self.data_clean = self.clean_data_list_by_mask(mask, self.data_clean)
             self.cleaning_level["title_freq"] = True
-        # If titles to drop wasn't provided stop here
+        # If titles to drop wasn't provided stop here -- note this is generally being done in the DB query methods now
         if not titles_to_drop:
             return
         # Remove titles in the titles_to_drop list from the titles/data
@@ -291,14 +177,87 @@ class Pipeline:
         if not self.data_clean:
             self.titles_clean = self.titles_raw
             self.data_clean = self.data_raw
+        # Flatten the data to create skills vocab, join skills lists in preparation for tokenization
         for row in self.data_clean:
             skills_flat.extend(row)
             data_join.append(", ".join(row))
         self.data_clean = data_join
         self.cleaning_level["joined"] = True
         skills_flat = pd.Series(skills_flat, dtype=str)
+        # Keep the top skill_depth skills as vocab -- could consider doing this by frequency as well
         mask = skills_flat.isin(skills_flat.value_counts()[:skill_depth].index)
         self.skills_vocabulary = skills_flat[mask].drop_duplicates().tolist()
+
+    # Drop rows from our matrices and data/titles lists that don't have a row sum > min_skill_length in the count matrix
+    # Likely the data was already filtered by some min_skill_length during the DB extraction
+    # However, now that we've established our CountVectorizer vocabulary, we can re-apply this requirement
+    def drop_matrix_rows_by_sum(self, min_skill_length=5):
+        mask = (self.data_count_matrix.sum(axis=1) >= min_skill_length).reshape(1, -1).tolist()[0]
+        # This try/except is only necessary because self.titles_clean isn't consistently typed, might be a list
+        try:
+            self.titles_clean = self.titles_clean[mask]
+        except TypeError:
+            self.titles_clean = pd.Series(self.titles_clean, dtype=str)
+            self.titles_clean = self.titles_clean[mask]
+        self.data_clean = self.clean_data_list_by_mask(mask, self.data_clean)
+        self.data_tfidf_matrix = self.data_tfidf_matrix.toarray()[mask]  # This may try to allocate alot of memory...
+        self.cleaning_level["count_vec_sum"] = True
+
+    # Sort the skills data by unique job titles and randomly subsample up to some depth
+    # The functionality of drop_matrix_rows_by_sum is included in this function for convenience
+    def subsample_data(self, min_skill_length=5, subsample_depth=200):
+        # Make sure count_vectorizezr, tfidf_transformer were initialized
+        if self.count_vectorizer is None:
+            print("Pipeline.subsample_data : count_vectorizer object wasn't initialized, exiting.")
+            sys.exit(2)
+        if self.tfidf_transformer is None:
+            print("Pipeline.subsample_data : tfidf_transformer object wasn't initialized, exiting.")
+            sys.exit(2)
+        # Make sure we encoded our titles -- this is mostly about saving on memory usage
+        if len(self.titles_encoded) != len(self.titles_clean):
+            print("Pipeline.subsample_data : titles_encoded and titles clean have inconsistent lengths, exiting ")
+            sys.exit(2)
+
+        # If we haven't done any cleaning previously, start from the raw data
+        if not self.data_clean:
+            self.titles_clean = self.titles_raw
+            self.data_clean = self.data_raw
+        # We're going to sort the skills by titles so we can subsample, start by preparing a dict
+        unique_titles = pd.Series(self.titles_encoded, dtype=int).drop_duplicates().tolist()
+        data_by_title = dict()
+        for title in unique_titles:
+            data_by_title[title] = list()
+        # Loop over our data and sort by title
+        for index, row in enumerate(self.data_clean):
+            data_by_title[self.titles_encoded[index]].append(row)
+
+        # Randomly subsample the data split by titles and TF-IDF transform it
+        # The functionality of drop_matrix_rows_by_sum is also applied here
+        data_subsampled_matrices = dict()
+        for index, key in enumerate(data_by_title):
+            # Only subsample if we have more than subsample_depth profiles for a particular title
+            if len(data_by_title[key]) > subsample_depth:
+                self.data_subsampled[key] = sample(data_by_title[key], subsample_depth)
+            else:
+                self.data_subsampled[key] = data_by_title[key]
+            matrix = self.count_vectorizer.transform(self.data_subsampled[key]).toarray()
+            mask = np.sum(matrix, axis=1) > min_skill_length
+            matrix = matrix[mask]
+            # This can result in an empty matrix which will break the tfidf transformer
+            if matrix.shape[0] == 0:
+                continue
+            self.data_subsampled[key] = self.clean_data_list_by_mask(mask, self.data_subsampled[key])
+            self.cleaning_level["count_vec_sum"] = True
+            matrix = self.tfidf_transformer.transform(matrix).toarray()
+            # Add the title as a column so we can split it off later and have consistent indices
+            titles_col = np.array([[key] * matrix.shape[0]]).reshape(-1, 1)
+            data_subsampled_matrices[key] = np.concatenate((matrix, titles_col), axis=1)
+        # **WARNING** This concatenation can eat up a lot of memory!
+        self.data_tfidf_matrix = np.concatenate([data_subsampled_matrices[key] for key in data_subsampled_matrices.keys()], axis=0)
+        # We stored the titles in the last column of the matrix so we could grab them here
+        self.titles_subsampled = self.data_tfidf_matrix[:,-1]
+        # Can now drop the last column from the larger matrix
+        self.data_tfidf_matrix = self.data_tfidf_matrix[:, :-1]
 
     # Initialize the CountVectorizer with our vocab and transform the data
     # self.count_vectorizer can be dumped to a binary for later use by calling dump_binaries()
@@ -314,29 +273,17 @@ class Pipeline:
         self.tfidf_transformer.fit(data)
         self.data_tfidf_matrix = self.tfidf_transformer.transform(data)
 
+    # Initialize the label encoder and transform the titles
+    # This can be used to reduce memory intensity (storing titles as ints instead of strings)
     def setup_label_encoder_and_fit_transform(self):
         self.label_encoder = LabelEncoder()
         self.titles_encoded = self.label_encoder.fit_transform(self.titles_clean)
 
+    # Initialize the standard scaler and transform the data -- needs to have been binary or TFIDF encoded already
     def setup_standard_scaler_and_fit_transform(self, training_data):
         self.scaler = StandardScaler()
         training_data_scaled = self.scaler.fit_transform(training_data)
         return training_data_scaled
-
-    # Drop rows from our matrices and data/titles lists that don't have a row sum > min_skill_length in the count matrix
-    # Likely the data was already filtered by some min_skill_length during the DB extraction
-    # However, now that we've established our CountVectorizer vocabulary, we can re-apply this requirement
-    def drop_matrix_rows_by_sum(self, min_skill_length=5):
-        mask = (self.data_count_matrix.sum(axis=1) >= min_skill_length).reshape(1, -1).tolist()[0]
-        # This try/except is only necessary because self.titles_clean isn't consistently typed... should fix
-        try:
-            self.titles_clean = self.titles_clean[mask]
-        except TypeError:
-            self.titles_clean = pd.Series(self.titles_clean, dtype=str)
-            self.titles_clean = self.titles_clean[mask]
-        self.data_clean = self.clean_data_list_by_mask(mask, self.data_clean)
-        self.data_tfidf_matrix = self.data_tfidf_matrix.toarray()[mask]  # This may try to allocate alot of memory...
-        self.cleaning_level["count_vec_sum"] = True
 
     # Dump class vars to binaries for later use
     # Mostly exists for cases where a partial pre-pocessing needs to be re-started from some interim step
@@ -348,29 +295,26 @@ class Pipeline:
         dump(self.titles_clean, self.binary_path + "titles_clean.joblib")
         dump(self.data_clean, self.binary_path + "data_clean.joblib")
         dump(self.cleaning_level, self.binary_path + "cleaning_level_dict.joblib")
-        dump(self.skills_vocabulary, self.binary_path + "skills_vocabulary.joblib")
         dump(self.count_vectorizer, self.binary_path + "count_vectorizer.joblib")
         dump(self.tfidf_transformer, self.binary_path + "tfidf_transformer.joblib")
-        dump(self.data_tfidf_matrix, self.binary_path + "data_tfidf_matrix.joblib")
-        dump(self.data_count_matrix, self.binary_path + "data_count_matrix.joblib")
         dump(self.label_encoder, self.binary_path + "label_encoder.joblib")
         dump(self.titles_encoded, self.binary_path + "titles_encoded.joblib")
+        dump(self.data_subsampled, self.binary_path + "data_subsampled.joblib")
+        dump(self.titles_subsampled, self.binary_path + "titles_subsampled.joblib")
         dump(self.scaler, self.binary_path + "scaler.joblib")
 
     # Load existing binaries into class vars
-    # classify_mode=True loads additional binaries needed for classifying/interpreting classification model output
-    def load_binaries(self, classify_mode=False):
+    def load_binaries(self):
         self.titles_clean = load(self.binary_path + "titles_clean.joblib")
         self.data_clean = load(self.binary_path + "data_clean.joblib")
         self.cleaning_level = load(self.binary_path + "cleaning_level_dict.joblib")
-        self.skills_vocabulary = load(self.binary_path + "skills_vocabulary.joblib")
+        self.count_vectorizer = load(self.binary_path + "count_vectorizer.joblib")
         self.tfidf_transformer = load(self.binary_path + "tfidf_transformer.joblib")
-        self.data_tfidf_matrix = load(self.binary_path + "data_tfidf_matrix.joblib")
-        self.data_count_matrix = load(self.binary_path + "data_count_matrix.joblib")
-        if classify_mode:
-            self.label_encoder = load(self.binary_path + "label_encoder.joblib")
-            self.titles_encoded = load(self.binary_path + "titles_encoded.joblib")
-            self.scaler = load(self.binary_path + "scaler.joblib")
+        self.label_encoder = load(self.binary_path + "label_encoder.joblib")
+        self.titles_encoded = load(self.binary_path + "titles_encoded.joblib")
+        self.data_subsampled = load(self.binary_path + "data_subsampled.joblib")
+        self.titles_subsampled = load(self.binary_path + "titles_subsampled.joblib")
+        self.scaler = load(self.binary_path + "scaler.joblib")
 
     # Run the full clustering pipeline in order
     def run_clustering_pipeline(self, min_skill_length=5, drop_titles=list(), skill_depth=10000, min_title_freq=3, verbose=0):
