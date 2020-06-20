@@ -2,7 +2,7 @@
 database_name = "FutureFitAI_database"
 collection_name = "talent_profiles_CAN"
 
-# Where to dump binaries, leave as empty string if you don't want to save them
+# Where to dump binaries
 binary_path = ""
 
 # How deep into the skill list do we want to go (sorted by value counts)
