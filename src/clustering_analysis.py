@@ -90,10 +90,10 @@ while len(pure_clusters) < cfg.n_target_clusters:
             pure_clusters.append(cluster)
         else:
             left = children[cluster - children.shape[0] - 1][0]
-            if left > children.shape[0] and len(clustering_tree[left]["child_indices"]) > min_clus_size:
+            if left > children.shape[0] and len(clustering_tree[left]["child_indices"]) > cfg.min_clus_size:
                 tmp_clusters.append(left)
             right = children[cluster - children.shape[0] - 1][1]
-            if right > children.shape[0] and len(clustering_tree[right]["child_indices"]) > min_clus_size:
+            if right > children.shape[0] and len(clustering_tree[right]["child_indices"]) > cfg.min_clus_size:
                 tmp_clusters.append(right)
     clusters = tmp_clusters
 
