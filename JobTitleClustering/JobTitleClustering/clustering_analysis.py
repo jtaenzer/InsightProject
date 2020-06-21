@@ -3,6 +3,7 @@ import numpy as np
 from joblib import load, dump
 from wordcloud import WordCloud
 from matplotlib import pyplot as plt
+import configs.analysis_config as cfg
 
 """
 cluster_analysis.py -- produces word cloud plots from a fitted AgglomerativeClustering model
@@ -12,22 +13,14 @@ This can then be unwound to some target number of clusters, after which word clo
 in each cluster. A first, basic attempt at deciding on labels for the clusters can come from the word clouds. 
 """
 
-path = "D:/FutureFit/clustering_tfidf_canada/subsampled_120kprofiles/binaries/"
-# How many clusters do we want to find?
-n_target_clusters = 100
-# Do we want to ignore small clusters?
-min_clus_size = 200
-# Minimum purity -- to find good quality clusters we want them to be dominated by a particular title
-min_purity = 10
-core_skills_depth = 15
 # Load our fitted clustering model and the data that went into the clustering
-clustering = load(path + "clustering_model.joblib")
-titles = load(path + "titles_subsampled.joblib")
-labelenc = load(path + "label_encoder.joblib")
+clustering = load(cfg.binary_path + "clustering_model.joblib")
+titles = load(cfg.binary_path + "titles_subsampled.joblib")
+labelenc = load(cfg.binary_path + "label_encoder.joblib")
 title_encoding = labelenc.classes_
-data_dict = load(path + "data_subsampled.joblib")
-count_vectorizer = load(path + "count_vectorizer.joblib")
-tfidf_transformer = load(path + "tfidf_transformer.joblib")
+data_dict = load(cfg.binary_path + "data_subsampled.joblib")
+count_vectorizer = load(cfg.binary_path + "count_vectorizer.joblib")
+tfidf_transformer = load(cfg.binary_path + "tfidf_transformer.joblib")
 titles = titles.tolist()  # Titles was saved as a pandas series
 
 
@@ -38,7 +31,7 @@ for key in data_dict.keys():
         tmp_skills.extend(row.split(", "))
     tmp_series = pd.Series(tmp_skills, dtype=str)
     key_str = title_encoding.tolist()[key]
-    core_skills_dict[key_str] = tmp_series.value_counts()[:core_skills_depth].index.tolist()
+    core_skills_dict[key_str] = tmp_series.value_counts()[:cfg.core_skills_depth].index.tolist()
 
 
 children = clustering.children_
@@ -53,29 +46,22 @@ for index, row in enumerate(children):
     # Title and skills can be taken directly from the data
     if row[0] < clustering.n_leaves_:
         titles1 = [title_encoding[int(titles[int(row[0])])]]
-        #skills1 = data[int(row[0])].split(", ")
         indices1 = [int(row[0])]
     # If we haven't found a singleton, fill indices/titles/skills from a previous iteration of this loop!
     # Note: since we're looping through the clustering matrix in order, singletons will always be added first
     else:
         titles1 = clustering_tree[int(row[0])]["child_titles"]
-        #skills1 = clustering_tree[int(row[0])]["child_skills"]
         indices1 = clustering_tree[int(row[0])]["child_indices"]
     # Same as above but for the other index in the clustering matrix
     if row[1] < clustering.n_leaves_:
         titles2 = [title_encoding[int(titles[int(row[1])])]]
-        #skills2 = data[int(row[1])].split(", ")
         indices2 = [int(row[1])]
     else:
         titles2 = clustering_tree[int(row[1])]["child_titles"]
-        #skills2 = clustering_tree[int(row[1])]["child_skills"]
         indices2 = clustering_tree[int(row[1])]["child_indices"]
 
     clustering_tree[1 + index + len(children)] = {"child_titles": titles1+titles2,
-                                                  "child_indices": indices1+indices2,
-                                                  #"child_skills": skills1+skills2
-                                                  }
-
+                                                  "child_indices": indices1+indices2}
 
 # Define the starting point to unwind our clustering tree -- this could be tunable
 # For now we are starting from the top-most cluster which should contain all possible children
@@ -93,14 +79,14 @@ clusters.append(children[children.shape[0] - 1][1])
 # (2) Depending on min_purity this can remove large chunks of the data and up with only very small clusters
 #     There is no way obvious way around this, tuning n_target_clusters and min_purity is necessary to get good output
 pure_clusters = list()
-while len(pure_clusters) < n_target_clusters:
+while len(pure_clusters) < cfg.n_target_clusters:
     if len(clusters) == 0:
         break
     tmp_clusters = list()
     for cluster in clusters:
         titles_ser = pd.Series(clustering_tree[cluster]["child_titles"], dtype=str)
         purity = 100*titles_ser.value_counts()[0]/titles_ser.value_counts().sum()
-        if purity > min_purity:
+        if purity > cfg.min_purity:
             pure_clusters.append(cluster)
         else:
             left = children[cluster - children.shape[0] - 1][0]
@@ -111,12 +97,16 @@ while len(pure_clusters) < n_target_clusters:
                 tmp_clusters.append(right)
     clusters = tmp_clusters
 
-count=0
+count = 0
+unique_clusters = list()
 cluster_centroid_dict = dict()
 # Generate word clouds of the titles and skills from the clusters we collected above!
 for cluster in pure_clusters:
     titles_ser = pd.Series(clustering_tree[cluster]["child_titles"], dtype=str)
+    count += len(titles_ser)
     cluster_label_str = titles_ser.value_counts().index[0]
+    if cluster_label_str not in unique_clusters:
+        unique_clusters.append(cluster_label_str)
     cluster_label_enc = title_encoding.tolist().index(cluster_label_str)
 
     cluster_matrix = count_vectorizer.transform(data_dict[cluster_label_enc]).toarray()
@@ -124,9 +114,15 @@ for cluster in pure_clusters:
     cluster_matrix = cluster_matrix[mask]
     cluster_matrix = tfidf_transformer.transform(cluster_matrix).toarray()
     centroid = np.mean(cluster_matrix, axis=0)
-    cluster_centroid_dict[cluster] = {"label": cluster_label_str, "centroid": centroid, "neighbours": []}
+    cluster_centroid_dict[cluster] = {"label": cluster_label_str, "centroid": centroid}
 
     skills_ser = pd.Series(core_skills_dict[cluster_label_str])
+
+    print("Cluster {}".format(cluster))
+    print("Label, label count, purity: ({0}, {1}, {2})".format(cluster_label_str, titles_ser.value_counts()[0], 100*titles_ser.value_counts()[0]/len(titles_ser)))
+    print("Size: {}".format(len(titles_ser)))
+    print("Unique titles: {}".format(len(titles_ser.value_counts())))
+    print()
 
     wordcloud = WordCloud(width=800, height=800,
                           background_color='white',
@@ -135,7 +131,7 @@ for cluster in pure_clusters:
     plt.imshow(wordcloud)
     plt.axis("off")
     plt.tight_layout(pad=0)
-    plt.savefig(path + "/plots/cluster{}_title_word_cloud.png".format(cluster))
+    plt.savefig(cfg.plot_path + "{0}_cluster{1}_titles_wordcloud.png".format(cluster_label_str, cluster))
     plt.close()
 
     plt.figure(figsize=(25, 10))
@@ -146,7 +142,7 @@ for cluster in pure_clusters:
     plt.ylabel("Count")
     annotate_str = "Cluster size (N profiles): {}".format(len(titles_ser))
     plt.annotate(annotate_str, xy=(0.7, 0.8), xycoords='axes fraction')
-    plt.savefig(path + "/plots/cluster{}_titles_histogram.png".format(cluster))
+    plt.savefig(cfg.plot_path + "{0}_cluster{1}_titles_histogram.png".format(cluster_label_str, cluster))
     plt.close()
     
     wordcloud = WordCloud(width=800, height=800,
@@ -155,7 +151,7 @@ for cluster in pure_clusters:
     plt.imshow(wordcloud)
     plt.axis("off")
     plt.tight_layout(pad=0)
-    plt.savefig(path + "/plots/cluster{}_skills_word_cloud.png".format(cluster))
+    plt.savefig(cfg.plot_path + "{0}_cluster{1}_skills_wordcloud.png".format(cluster_label_str, cluster))
     plt.close()
 
     plt.figure(figsize=(25, 10))
@@ -166,9 +162,8 @@ for cluster in pure_clusters:
     plt.ylabel("Count")
     annotate_str = "Cluster size (N profiles): {}".format(len(titles_ser))
     plt.annotate(annotate_str, xy=(0.7, 0.8), xycoords='axes fraction')
-    plt.savefig(path + "/plots/cluster{}_skills_histogram.png".format(cluster))
+    plt.savefig(cfg.plot_path + "{0}_cluster{1}_skills_histogram.png".format(cluster_label_str, cluster))
     plt.close()
 
-
-dump(core_skills_dict, path + "core_skills_dict_key_str.joblib")
-dump(cluster_centroid_dict, path + "cluster_centroid_dict.joblib")
+dump(core_skills_dict, cfg.binary_path + "core_skills_dict_key_str.joblib")
+dump(cluster_centroid_dict, cfg.binary_path + "cluster_centroid_dict.joblib")
