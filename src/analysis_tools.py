@@ -6,6 +6,19 @@ class AnalysisTools:
     def __init__(self):
         pass
 
+
+    @staticmethod
+    def build_core_skills(data, title_encoding, depth=10):
+        core_skills = dict()
+        for key in data.keys():
+            tmp_skills = list()
+            for index, row in enumerate(data[key]):
+                tmp_skills.extend(row.split(", "))
+            tmp_series = pd.Series(tmp_skills, dtype=str)
+            key_str = title_encoding.tolist()[key]
+            core_skills[key_str] = tmp_series.value_counts()[:depth].index.tolist()
+        return core_skills
+
     # Generate a dictionary holding the tree-like structure of the clustering tree
     # Could also be useful to have a field that holds the direct parent and descendants of each cluster
     @staticmethod
