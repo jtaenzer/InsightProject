@@ -6,10 +6,9 @@ from pipeline import Pipeline
 
 data_pipeline = Pipeline("FutureFitAI_database", "talent_profiles", binary_path=cfg.binary_path)
 print("Getting raw data from the DB")
-data_pipeline.get_all_skills_primary(min_skill_length=cfg.min_skill_length)
-print(len(data_pipeline.titles_raw))
+data_pipeline.get_titles_and_skills_data(min_skill_length=cfg.min_skill_length, drop_list=cfg.titles_to_drop)
 print("Dropping titles from bad title list from data")
-data_pipeline.drop_titles_from_data(cfg.titles_to_drop, min_title_freq=cfg.min_title_freq)
+data_pipeline.drop_titles_from_data([], min_title_freq=cfg.min_title_freq)
 print("Preparing data for CountVectorizer and TfidfTransformer")
 data_pipeline.prepare_data_for_count_vectorizer(skill_depth=cfg.min_skill_depth)
 print("Tranforming with CountVectorizer")
