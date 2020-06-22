@@ -3,6 +3,7 @@ import numpy as np
 from joblib import load, dump
 from wordcloud import WordCloud
 from matplotlib import pyplot as plt
+from analysis_tools import AnalysisTools
 import configs.analysis_config as cfg
 
 """
@@ -23,87 +24,26 @@ count_vectorizer = load(cfg.binary_path + "count_vectorizer.joblib")
 tfidf_transformer = load(cfg.binary_path + "tfidf_transformer.joblib")
 titles = titles.tolist()  # Titles was saved as a pandas series
 
+tools = AnalysisTools()
 
-core_skills_dict = dict()
-for key in data_dict.keys():
-    tmp_skills = list()
-    for index, row in enumerate(data_dict[key]):
-        tmp_skills.extend(row.split(", "))
-    tmp_series = pd.Series(tmp_skills, dtype=str)
-    key_str = title_encoding.tolist()[key]
-    core_skills_dict[key_str] = tmp_series.value_counts()[:cfg.core_skills_depth].index.tolist()
-
-
-children = clustering.children_
-print("Clustering children shape: {}".format(children.shape))
+# Find the core skills for each title that we encoded before clustering
+core_skills_dict = tools.build_core_skills(data_dict, title_encoding, depth=cfg.core_skills_depth)
+# Re-build the tree-like structure of the clustering so we can unwind it
+clustering_tree = tools.build_clustering_tree(clustering, titles, title_encoding)
+# Unwind the clustering tree looking for clusters with some minimum size and purity
+pure_clusters = tools.find_pure_clusters(clustering, clustering_tree,
+                                         cfg.n_target_clusters, cfg.min_clus_size, cfg.min_purity)
 
 
-# Generate a dictionary holding the tree-like structure of the clustering tree
-# Could also be useful to have a field that holds the direct direct descendants of each cluster
-clustering_tree = dict()
-for index, row in enumerate(children):
-    # Check if we've found a singleton, in that case the index is exactly whats in the clustering matrix
-    # Title and skills can be taken directly from the data
-    if row[0] < clustering.n_leaves_:
-        titles1 = [title_encoding[int(titles[int(row[0])])]]
-        indices1 = [int(row[0])]
-    # If we haven't found a singleton, fill indices/titles/skills from a previous iteration of this loop!
-    # Note: since we're looping through the clustering matrix in order, singletons will always be added first
-    else:
-        titles1 = clustering_tree[int(row[0])]["child_titles"]
-        indices1 = clustering_tree[int(row[0])]["child_indices"]
-    # Same as above but for the other index in the clustering matrix
-    if row[1] < clustering.n_leaves_:
-        titles2 = [title_encoding[int(titles[int(row[1])])]]
-        indices2 = [int(row[1])]
-    else:
-        titles2 = clustering_tree[int(row[1])]["child_titles"]
-        indices2 = clustering_tree[int(row[1])]["child_indices"]
+if cfg.verbose:
+    data_frac = 100*sum([len(clustering_tree[cluster]["child_titles"]) for cluster in pure_clusters])/len(titles)
+    print("Found {0} clusters containing {1:.1f}% of the input data".format(len(pure_clusters), data_frac))
 
-    clustering_tree[1 + index + len(children)] = {"child_titles": titles1+titles2,
-                                                  "child_indices": indices1+indices2}
-
-# Define the starting point to unwind our clustering tree -- this could be tunable
-# For now we are starting from the top-most cluster which should contain all possible children
-clusters = list()
-clusters.append(children[children.shape[0] - 1][0])
-clusters.append(children[children.shape[0] - 1][1])
-# Unwind the clustering tree we build earlier until we arrive at n_target_clusters or run out of clusters
-# Deciding whether to keep a cluster for analysis is based on its purity:
-# purity = 100*titles_ser.value_counts()[0]/titles_ser.value_counts().sum()
-# I.E. What fraction of the cluster is the title with the highest count?
-# Some caveats:
-# (1) Because we generally don't want to see singletons or "small" clusters, they are dropped
-#     Depending on n_target_clusters and nature of the clustering, this can lead to never reaching n_target_clusters
-#     Hence the if len(clusters) == 0: break
-# (2) Depending on min_purity this can remove large chunks of the data and up with only very small clusters
-#     There is no way obvious way around this, tuning n_target_clusters and min_purity is necessary to get good output
-pure_clusters = list()
-while len(pure_clusters) < cfg.n_target_clusters:
-    if len(clusters) == 0:
-        break
-    tmp_clusters = list()
-    for cluster in clusters:
-        titles_ser = pd.Series(clustering_tree[cluster]["child_titles"], dtype=str)
-        purity = 100*titles_ser.value_counts()[0]/titles_ser.value_counts().sum()
-        if purity > cfg.min_purity:
-            pure_clusters.append(cluster)
-        else:
-            left = children[cluster - children.shape[0] - 1][0]
-            if left > children.shape[0] and len(clustering_tree[left]["child_indices"]) > cfg.min_clus_size:
-                tmp_clusters.append(left)
-            right = children[cluster - children.shape[0] - 1][1]
-            if right > children.shape[0] and len(clustering_tree[right]["child_indices"]) > cfg.min_clus_size:
-                tmp_clusters.append(right)
-    clusters = tmp_clusters
-
-count = 0
 unique_clusters = list()
 cluster_centroid_dict = dict()
 # Generate word clouds of the titles and skills from the clusters we collected above!
 for cluster in pure_clusters:
     titles_ser = pd.Series(clustering_tree[cluster]["child_titles"], dtype=str)
-    count += len(titles_ser)
     cluster_label_str = titles_ser.value_counts().index[0]
     if cluster_label_str not in unique_clusters:
         unique_clusters.append(cluster_label_str)
@@ -117,12 +57,11 @@ for cluster in pure_clusters:
     cluster_centroid_dict[cluster] = {"label": cluster_label_str, "centroid": centroid}
 
     skills_ser = pd.Series(core_skills_dict[cluster_label_str])
-
-    print("Cluster {}".format(cluster))
-    print("Label, label count, purity: ({0}, {1}, {2})".format(cluster_label_str, titles_ser.value_counts()[0], 100*titles_ser.value_counts()[0]/len(titles_ser)))
-    print("Size: {}".format(len(titles_ser)))
-    print("Unique titles: {}".format(len(titles_ser.value_counts())))
-    print()
+    if cfg.verbose:
+        print("Cluster {}".format(cluster))
+        print("Label, label count, purity: ({0}, {1}, {2})".format(cluster_label_str, titles_ser.value_counts()[0], 100*titles_ser.value_counts()[0]/len(titles_ser)))
+        print("Size: {}".format(len(titles_ser)))
+        print("Unique titles: {}\n".format(len(titles_ser.value_counts())))
 
     wordcloud = WordCloud(width=800, height=800,
                           background_color='white',
