@@ -1,4 +1,15 @@
-# JobTitleClustering
+# ClusTitle
+
+Try the webapp: [link](www.machinelearningprojects.xyz)
+
+## Table of contents
+
+* [Overview](https://github.com/jtaenzer/InsightProject#overview)
+* [Usage](https://github.com/jtaenzer/InsightProject#usage)
+* [Analysis](https://github.com/jtaenzer/InsightProject#analysis)
+* [Classify](https://github.com/jtaenzer/InsightProject#classify)
+
+## Overview
 
 The goal of this project is to take ~1m unique, self reported job titles in ~300M online talent projects and reduce the
 taxonomy of job titles using clustering.
@@ -66,3 +77,18 @@ python src/cluster.py
 Most of the heavy lifting takes place in the Pipeline class in pipeline.py, which will be discussed below.
 
 ## Analysis
+
+A script to perform a simple analysis of the clustering output is provided in src/cluster_analysis.py. Before running
+the script it is advised to open src/configs/analysis_config.py and read the descriptions of the tunable parameters.  
+
+Running the analysis:
+
+```
+python src/clustering_analysis.py
+```
+
+This will find some number of clusters and label them based on the most frequent title appearing in the cluster.
+Histograms and word clouds of the titles and skills appearing in each cluster can be generated as well. The centroid
+of each cluster will be calculated and saved in a binary.
+
+## Classify
