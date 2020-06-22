@@ -4,13 +4,7 @@ from sklearn.cluster import AgglomerativeClustering
 import configs.cluster_config as cfg
 from pipeline import Pipeline
 
-# Create the directory to save plots and models, if it doesn't exist already
-save_path = "./skill_freq_{0}_skill_length_{1}_title_freq_{2}/"\
-    .format(cfg.min_skill_depth, cfg.min_skill_length, cfg.min_title_freq)
-if not os.path.exists(save_path):
-    os.makedirs(save_path)
-
-data_pipeline = Pipeline("FutureFitAI_database", "talent_profiles", binary_path=save_path)
+data_pipeline = Pipeline("FutureFitAI_database", "talent_profiles", binary_path=cfg.binary_path)
 print("Getting raw data from the DB")
 data_pipeline.get_all_skills_primary(min_skill_length=cfg.min_skill_length)
 print(len(data_pipeline.titles_raw))
