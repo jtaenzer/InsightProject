@@ -51,7 +51,7 @@ map common acroynyms and abbreviations to reduce redundancy in the job title spa
 created. 
 
 *Titles still containing non alphanumeric characters after common symbols are removed are dropped in an attempt
-ignore titles written in foreign languages. This cleaning step may not be desirable!*
+drop titles written in foreign languages. This cleaning step may not be desirable!*
 
 Before running the script, note that the DB settings and data path are hard coded so it should be opened and edited as
 necessary.
@@ -65,7 +65,7 @@ python scripts/clean_db.py
 Before running any clustering, it is strongly advised that you open src/configs/cluster_config.py and read the
 descriptions of the tunable parameters. Clustering can be extremely memory intense so appropriate hyperparameter
 choices are a must. For example, if after the pipeline you have a matrix of size 200,000 x N entering the clustering,
-around 384 GB of RAM will be necessary to run the clustering. Depending on the size of the initial database, it may take
+around 380 GB of RAM will be necessary to run the clustering. Depending on the size of the initial database, it may take
 some experimentation to find appropriate parameters.
 
 Running the clustering:
@@ -74,7 +74,7 @@ Running the clustering:
 python src/cluster.py
 ```
 
-Most of the heavy lifting takes place in the Pipeline class in pipeline.py, which will be discussed below.
+Most of the heavy lifting takes place in the Pipeline class in pipeline.py, which is thoroughly commented.
 
 ## Analysis
 
@@ -90,5 +90,3 @@ python src/clustering_analysis.py
 This will find some number of clusters and label them based on the most frequent title appearing in the cluster.
 Histograms and word clouds of the titles and skills appearing in each cluster can be generated as well. The centroid
 of each cluster will be calculated and saved in a binary.
-
-## Classify
