@@ -1,7 +1,7 @@
 # Path to binaries to load
-binary_path = "D:/FutureFit/clustering_tfidf_canada/subsampled_120kprofiles/binaries/"
+binary_path = "../binaries/120k_profiles/"
 # Path to save plots
-plot_path = "D:/FutureFit/clustering_tfidf_canada/subsampled_120kprofiles/plots/"
+plot_path = "../plots/"
 
 # More information will be printed out
 verbose = True
