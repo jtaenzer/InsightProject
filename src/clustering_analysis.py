@@ -35,7 +35,7 @@ pure_clusters = tools.find_pure_clusters(clustering, clustering_tree,
 
 if cfg.verbose:
     data_frac = 100*sum([len(clustering_tree[cluster]["child_titles"]) for cluster in pure_clusters])/len(titles)
-    print("Found {0} clusters containing {1:.1f}% of the input data".format(len(pure_clusters), data_frac))
+    print("Found {0} clusters containing {1:.1f}% of the input data\n".format(len(pure_clusters), data_frac))
 
 unique_clusters = list()
 cluster_centroid_dict = dict()
