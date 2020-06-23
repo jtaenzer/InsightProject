@@ -91,6 +91,16 @@ This will find some number of clusters and label them based on the most frequent
 Histograms and word clouds of the titles and skills appearing in each cluster can be generated as well. The centroid
 of each cluster will be calculated and saved in a binary.
 
+### Existing Binaries
+
+Binaries for a 120k and 200k profile clustering are in the binary folder in this repo. The analysis can be run directly 
+on these binaries. See:
+
+```
+binaries/120k_profiles
+binaries/200k_profiles
+```
+
 ## Classify
 
 This is still a work in progress but the goal is to build a classifier from the clustering model. Starts similar to 
