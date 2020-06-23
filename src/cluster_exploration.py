@@ -52,6 +52,21 @@ def get_distances(X, model, mode='l2'):
         weights.append( wNew)
     return distances, weights
 
+def build_clustering_tree(clustering, linkage_matrix):
+    clustering_tree = dict()
+    for index, row in enumerate(linkage_matrix):
+        if row[0] < clustering.n_leaves_:
+            indices_left = [int(row[0])]
+        else:
+            indices_left = clustering_tree[int(row[0])]["left"] + clustering_tree[int(row[0])]["right"]
+        if row[1] < clustering.n_leaves_:
+            indices_right = [int(row[1])]
+        else:
+            indices_right = clustering_tree[int(row[1])]["left"] + clustering_tree[int(row[1])]["right"]
+        clustering_tree[1 + index + len(children)] = {"left": indices_left,
+                                                      "right": indices_right,
+                                                      "dist": row[2]}
+        return clustering_tree
 
 ### CONFIG
 titles_to_extract = ["data scientist", "registered nurse", "marketing manager"]
