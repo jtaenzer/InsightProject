@@ -90,3 +90,19 @@ python src/clustering_analysis.py
 This will find some number of clusters and label them based on the most frequent title appearing in the cluster.
 Histograms and word clouds of the titles and skills appearing in each cluster can be generated as well. The centroid
 of each cluster will be calculated and saved in a binary.
+
+## Classify
+
+This is still a work in progress but the goal is to build a classifier from the clustering model. Starts similar to 
+clustering_analysis by finding pure clusters based on the parameters in analysis_config.py. The clusters are labeled
+by the most frequently appearing title in the cluster, and these can be used to create a supervised learning model.
+Currently sklearn's MLPClassifier is used but this may not be the ideal model.
+
+Note that since the input matrix to the clustering is rebuilt in full, running this script may involve large memory
+allocations.
+
+Training the classifier:
+
+```
+python src/classify.py
+```
