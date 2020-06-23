@@ -316,13 +316,14 @@ class Pipeline:
         self.scaler = load(self.binary_path + "scaler.joblib")
 
     # Run the full clustering pipeline in order
-    def run_clustering_pipeline(self, min_skill_length=5, drop_titles=list(), skill_depth=10000, min_title_freq=3, verbose=0):
+    def run_clustering_pipeline(self, min_skill_length=5, drop_titles=list(), skill_depth=10000, min_title_freq=3,
+                                subsample_depth=0, verbose=0):
         if verbose:
             print("Getting raw data from the DB")
-        self.get_all_skills_primary(min_skill_length=min_skill_length)
+        self.get_titles_and_skills_data(min_skill_length=min_skill_length, drop_list=drop_titles)
         if verbose:
             print("Dropping titles from bad title list from data")
-        self.drop_titles_from_data(drop_titles, min_title_freq=min_title_freq)
+        self.drop_titles_from_data([], min_title_freq=min_title_freq)
         if verbose:
             print("Preparing data for CountVectorizer and TfidfTransformer")
         self.prepare_data_for_count_vectorizer(skill_depth=skill_depth)
@@ -332,9 +333,14 @@ class Pipeline:
         if verbose:
             print("Transforming with TfidfTransformer")
         self.setup_tfidf_transformer_and_fit_transform(self.data_count_matrix)
-        if verbose:
-            print("Dropping data points with too few skills")
-        self.drop_matrix_rows_by_sum(min_skill_length=min_skill_length)
+        if subsample_depth > 0:
+            if verbose:
+                print("Splitting data by title and subsampling")
+            self.subsample_data(min_skill_length=min_skill_length, subsample_depth=subsample_depth)
+        else:
+            if verbose:
+                print("Dropping data points with too few skills")
+            self.drop_matrix_rows_by_sum(min_skill_length=min_skill_length)
         if verbose:
             print("Dumping binaries")
         if self.binary_path:
