@@ -1,8 +1,6 @@
 import pandas as pd
 import numpy as np
 from joblib import load, dump
-from wordcloud import WordCloud
-from matplotlib import pyplot as plt
 from analysis_tools import AnalysisTools
 import configs.analysis_config as cfg
 
