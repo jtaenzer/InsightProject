@@ -1,84 +1,78 @@
-import os
-import sys
+import pandas as pd
 import numpy as np
 from joblib import dump, load
-import configs.classify_config as cfg
-from pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.neural_network import MLPClassifier
+from pipeline import Pipeline
+from analysis_tools import AnalysisTools
+import configs.analysis_config as cfg
 
-"""
-classify.py trains a single hidden layer MLPClassifier model to predict job titles from skills
+# Create AnalysisTools object for later use
+tools = AnalysisTools()
 
-Current version extracts a "pre-labeled" dataset directly from the DB -- will need to be adapted to use cluster labels
-"""
+# Use the pipeline for loading binaries and to store some objects
+data_pipeline = Pipeline("", "", binary_path=cfg.binary_path)
+data_pipeline.load_binaries()
+clustering_model = load(cfg.binary_path + "clustering_model.joblib")
+titles_subsampled = data_pipeline.titles_subsampled.tolist()
+title_encoding = data_pipeline.label_encoder.classes_.tolist()
 
-binary_path = cfg.binary_path + "skill_depth_{0}_skill_length_{1}_title_freq_{2}/".format(cfg.min_skill_depth, cfg.min_skill_length, cfg.min_title_freq)
+# Rebuild the tfidf transformed matrix
+print("Rebuilding clustering input")
+matrix_list = list()
+for key in data_pipeline.data_subsampled.keys():
+    cluster_matrix = data_pipeline.count_vectorizer.transform(data_pipeline.data_subsampled[key]).toarray()
+    cluster_matrix = cluster_matrix[np.sum(cluster_matrix, axis=1) > cfg.min_skill_length]
+    cluster_matrix = data_pipeline.tfidf_transformer.transform(cluster_matrix).toarray()
+    matrix_list.append(cluster_matrix)
+data_tfidf_matrix = np.concatenate([matrix for matrix in matrix_list], axis=0)
 
-# Create the binary directory if it doesn't exist
-if not os.path.exists(cfg.binary_path):
-    os.makedirs(cfg.binary_path)
+# Find the core skills for each title that we encoded before clustering
+print("Getting core skills")
+core_skills_dict = tools.build_core_skills(data_pipeline.data_subsampled, title_encoding, depth=cfg.core_skills_depth)
+# Re-build the tree-like structure of the clustering so we can unwind it
+print("Building clustering tree")
+clustering_tree = tools.build_clustering_tree(clustering_model, titles_subsampled, title_encoding)
+# Unwind the clustering tree looking for clusters with some minimum size and purity
+print("Finding pure clusters")
+pure_clusters = tools.find_pure_clusters(clustering_model, clustering_tree,
+                                         cfg.n_target_clusters, cfg.min_clus_size, cfg.min_purity)
 
-data_pipeline = Pipeline("FutureFitAI_database", cfg.collection_name, binary_path=cfg.binary_path)
-print("Getting raw data from the DB")
-data_pipeline.get_all_skills_primary(min_skill_length=cfg.min_skill_length)
-print("Dropping titles from bad title list from data")
-data_pipeline.drop_titles_from_data(cfg.titles_to_drop, min_title_freq=cfg.min_title_freq)
-print("Preparing data for CountVectorizer and TfidfTransformer")
-data_pipeline.prepare_data_for_count_vectorizer(skill_depth=cfg.min_skill_depth)
-print("Tranforming with CountVectorizer")
-data_pipeline.setup_count_vectorizer_and_transform()
-print("Transforming with TfidfTransformer")
-data_pipeline.setup_tfidf_transformer_and_fit_transform(data_pipeline.data_count_matrix)
-print("Integer encoding titles")
-data_pipeline.setup_label_encoder_and_fit_transform()
+# Create and dump core_skills_dict
+core_skills_dict = dict()
+for key in data_pipeline.data_subsampled.keys():
+    tmp_skills = list()
+    for index, row in enumerate(data_pipeline.data_subsampled[key]):
+        tmp_skills.extend(row.split(", "))
+    tmp_series = pd.Series(tmp_skills, dtype=str)
+    core_skills_dict[key] = tmp_series.value_counts()[:cfg.core_skills_depth].index.tolist()
+dump(core_skills_dict, cfg.binary_path + "core_skills_dict.joblib")
 
-# More of the code below could be moved into the pipeline
-print("Splitting data by title")
-data_str_dict = dict()
-for title in data_pipeline.titles_encoded:
-    data_str_dict[title] = []
+print("Preparing training data")
+# Create training data from clusters
+training_data_list = list()
+for cluster in pure_clusters:
+    # Label
+    titles_ser = pd.Series(clustering_tree[cluster]["child_titles"], dtype=str)
+    cluster_label_enc = title_encoding.index(titles_ser.value_counts().index[0])
+    # Matrix
+    cluster_matrix = data_tfidf_matrix[clustering_tree[cluster]["child_indices"]]
+    output_column = np.array([[cluster_label_enc]*cluster_matrix.shape[0]]).reshape(-1, 1)
+    cluster_matrix = np.concatenate((cluster_matrix, output_column), axis=1)
+    np.random.shuffle(cluster_matrix)
+    training_data_list.append(cluster_matrix[:int(cfg.train_test_frac*cluster_matrix.shape[0]), :])
 
-for index, row in enumerate(data_pipeline.data_clean):
-    data_str_dict[data_pipeline.titles_encoded[index]].append(row)
+training_data_matrix = np.concatenate([matrix for matrix in training_data_list], axis=0)
+np.random.shuffle(training_data_matrix)
+X_train, y_train = training_data_matrix[:, :-1], training_data_matrix[:, -1]
 
-print("Splitting training and testing data")
-data_training = dict()
-data_testing = dict()
-for index, key in enumerate(data_str_dict):
-    if index % 10 == 0:
-        sys.stdout.write("\r")
-        sys.stdout.write("{:2.0f}".format(float(index / len(data_str_dict)) * 100) + "%")
-    matrix = data_pipeline.tfidf_transformer.transform(data_pipeline.count_vectorizer.transform(data_str_dict[key])).toarray()
-    matrix = matrix[np.sum(matrix, axis=1) != 0]
-    np.random.shuffle(matrix)
-    data_training[key] = matrix[:int(matrix.shape[0]*cfg.train_test_frac), :]
-    titles_col = np.array([[key]*data_training[key].shape[0]]).reshape(-1, 1)
-    data_training[key] = np.concatenate((data_training[key], titles_col), axis=1)
+scaler = StandardScaler()
+X_train = scaler.fit_transform(X_train)
 
-    data_testing[key] = matrix[int(matrix.shape[0]*cfg.train_test_frac):, :]
-    titles_col = np.array([[key]*data_testing[key].shape[0]]).reshape(-1, 1)
-    data_testing[key] = np.concatenate((data_testing[key], titles_col), axis=1)
-print()
-
-
-data_training_mat = np.concatenate([data_training[key] for key in data_training.keys()], axis=0)
-dump(data_training_mat, cfg.binary_path + "data_training_matrix.joblib")
-data_testing_mat = np.concatenate([data_testing[key] for key in data_testing.keys()], axis=0)
-dump(data_testing_mat, cfg.binary_path + "data_testing_matrix.joblib")
-
-print("Preparing model")
-X_train, y_train = data_training_mat[:, :-1], data_training_mat[:, -1]
-X_test, y_test = data_testing_mat[:, :-1], data_testing_mat[:, -1]
-print(X_train.shape, y_train.shape)
-print(X_test.shape, y_test.shape)
-
-X_train = data_pipeline.setup_standard_scaler_and_fit_transform(X_train)
-
-print("dumping binaries")
-data_pipeline.dump_binaries()
-
+print("Fitting model")
+print(X_train.shape)
 mlp = MLPClassifier(hidden_layer_sizes=(X_train.shape[1], int((2/3)*X_train.shape[1]),
                                         len(data_pipeline.label_encoder.classes_)), max_iter=1000, verbose=True)
-print("Fitting model")
+
 mlp.fit(X_train, y_train)
-dump(mlp, cfg.binary_path + "model.joblib")
+dump(mlp, cfg.binary_path + "MLPClassifier_model.joblib")
