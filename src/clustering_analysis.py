@@ -7,7 +7,7 @@ from analysis_tools import AnalysisTools
 import configs.analysis_config as cfg
 
 """
-cluster_analysis.py -- produces word cloud plots from a fitted AgglomerativeClustering model
+cluster_analysis.py -- produces word cloud and histogram plots from a fitted AgglomerativeClustering model
 
 Uses the clustering matrix (model.children_) to create dictionary holding the tree like structure of the clustering
 This can then be unwound to some target number of clusters, after which word clouds are made from the singletons
@@ -62,47 +62,13 @@ for cluster in pure_clusters:
         print("Label, label count, purity: ({0}, {1}, {2})".format(cluster_label_str, titles_ser.value_counts()[0], 100*titles_ser.value_counts()[0]/len(titles_ser)))
         print("Size: {}".format(len(titles_ser)))
         print("Unique titles: {}\n".format(len(titles_ser.value_counts())))
-
-    wordcloud = WordCloud(width=800, height=800,
-                          background_color='white',
-                          min_font_size=5).generate_from_frequencies(titles_ser.value_counts().to_dict())
-    plt.figure(figsize=(8, 8), facecolor=None)
-    plt.imshow(wordcloud)
-    plt.axis("off")
-    plt.tight_layout(pad=0)
-    plt.savefig(cfg.plot_path + "{0}_cluster{1}_titles_wordcloud.png".format(cluster_label_str, cluster))
-    plt.close()
-
-    plt.figure(figsize=(25, 10))
-    plt.bar(range(len(titles_ser.value_counts()[:15])), titles_ser.value_counts()[:15].values.tolist(), align='center')
-    plt.xticks(range(len(titles_ser.value_counts()[:15])), titles_ser.value_counts()[:15].index.values.tolist(), size=10, rotation=90)
-    plt.subplots_adjust(bottom=0.5)
-    plt.title("Titles in cluster {}".format(cluster))
-    plt.ylabel("Count")
-    annotate_str = "Cluster size (N profiles): {}".format(len(titles_ser))
-    plt.annotate(annotate_str, xy=(0.7, 0.8), xycoords='axes fraction')
-    plt.savefig(cfg.plot_path + "{0}_cluster{1}_titles_histogram.png".format(cluster_label_str, cluster))
-    plt.close()
-    
-    wordcloud = WordCloud(width=800, height=800,
-                          background_color='white',
-                          min_font_size=5).generate_from_frequencies(skills_ser.value_counts().to_dict())
-    plt.imshow(wordcloud)
-    plt.axis("off")
-    plt.tight_layout(pad=0)
-    plt.savefig(cfg.plot_path + "{0}_cluster{1}_skills_wordcloud.png".format(cluster_label_str, cluster))
-    plt.close()
-
-    plt.figure(figsize=(25, 10))
-    plt.bar(range(len(skills_ser.value_counts()[:15])), skills_ser.value_counts()[:15].values.tolist(), align='center')
-    plt.xticks(range(len(skills_ser.value_counts()[:15])), skills_ser.value_counts()[:15].index.values.tolist(), size=10, rotation=90)
-    plt.subplots_adjust(bottom=0.5)
-    plt.title("Skills in cluster {}".format(cluster))
-    plt.ylabel("Count")
-    annotate_str = "Cluster size (N profiles): {}".format(len(titles_ser))
-    plt.annotate(annotate_str, xy=(0.7, 0.8), xycoords='axes fraction')
-    plt.savefig(cfg.plot_path + "{0}_cluster{1}_skills_histogram.png".format(cluster_label_str, cluster))
-    plt.close()
+    if cfg.plotting:
+        # Make title plots
+        tools.make_word_cloud(titles_ser, cluster_label_str, cluster, plot_path=cfg.plot_path)
+        tools.make_histogram(titles_ser, cluster_label_str, cluster, depth=15, plot_path=cfg.plot_path)
+        # Make skills plots
+        tools.make_word_cloud(skills_ser, cluster_label_str, cluster, plot_path=cfg.plot_path)
+        tools.make_histogram(skills_ser, cluster_label_str, cluster, depth=15, plot_path=cfg.plot_path)
 
 dump(core_skills_dict, cfg.binary_path + "core_skills_dict_key_str.joblib")
 dump(cluster_centroid_dict, cfg.binary_path + "cluster_centroid_dict.joblib")
