@@ -1,4 +1,3 @@
-import os
 from joblib import dump
 from sklearn.cluster import AgglomerativeClustering
 import configs.cluster_config as cfg
@@ -32,4 +31,4 @@ print("Clustering")
 # Create and fit the model, dump output to a pickle in case we need it later
 model = AgglomerativeClustering(affinity=cfg.affinity, linkage=cfg.linkage, n_clusters=cfg.n_cluster_stop)
 clustering = model.fit(data_pipeline.data_tfidf_matrix)
-dump(model, save_path + "clustering_model.joblib")
+dump(model, cfg.binary_path + "clustering_model.joblib")
