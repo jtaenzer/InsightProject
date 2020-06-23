@@ -1,12 +1,14 @@
 import numpy as np
 import pandas as pd
+from wordcloud import WordCloud
+from matplotlib import pyplot as plt
 
 
 class AnalysisTools:
     def __init__(self):
         pass
 
-
+    # Find the N most frequently occurring skills for each title that went into the clustering
     @staticmethod
     def build_core_skills(data, title_encoding, depth=10):
         core_skills = dict()
@@ -133,9 +135,28 @@ class AnalysisTools:
         return distances, weights
 
     @staticmethod
-    def make_word_cloud(series_counts):
-        pass
+    def make_word_cloud(series, label, cluster, plot_path="./plots/"):
+        wordcloud = WordCloud(width=800, height=800,
+                              background_color='white',
+                              min_font_size=5).generate_from_frequencies(series.value_counts().to_dict())
+        plt.figure(figsize=(8, 8), facecolor=None)
+        plt.imshow(wordcloud)
+        plt.axis("off")
+        plt.tight_layout(pad=0)
+        plt.savefig(plot_path + "{0}_cluster{1}_titles_wordcloud.png".format(label, cluster))
+        plt.close()
 
     @staticmethod
-    def make_histogram(series_counts):
-        pass
+    def make_histogram(series, label, cluster, depth=15, plot_path="./plots/"):
+        plt.figure(figsize=(25, 10))
+        plt.bar(range(len(series.value_counts()[:depth])), series.value_counts()[:depth].values.tolist(),
+                align='center')
+        plt.xticks(range(len(series.value_counts()[:depth])), series.value_counts()[:depth].index.values.tolist(),
+                   size=10, rotation=90)
+        plt.subplots_adjust(bottom=0.5)
+        plt.title("Titles in cluster {}".format(cluster))
+        plt.ylabel("Count")
+        annotate_str = "Cluster size (N profiles): {}".format(len(series))
+        plt.annotate(annotate_str, xy=(0.7, 0.8), xycoords='axes fraction')
+        plt.savefig(plot_path + "{0}_cluster{1}_titles_histogram.png".format(label, cluster))
+        plt.close()
