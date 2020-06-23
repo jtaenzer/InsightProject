@@ -3,9 +3,10 @@ from sklearn.cluster import AgglomerativeClustering
 import configs.cluster_config as cfg
 from pipeline import Pipeline
 
-data_pipeline = Pipeline("FutureFitAI_database", "talent_profiles", binary_path=cfg.binary_path)
+data_pipeline = Pipeline(cfg.database_name, cfg.collection_name, binary_path=cfg.binary_path)
 print("Getting raw data from the DB")
 data_pipeline.get_titles_and_skills_data(min_skill_length=cfg.min_skill_length, drop_list=cfg.titles_to_drop)
+print(len(data_pipeline.titles_raw))
 print("Dropping titles from bad title list from data")
 data_pipeline.drop_titles_from_data([], min_title_freq=cfg.min_title_freq)
 print("Preparing data for CountVectorizer and TfidfTransformer")
