@@ -3,7 +3,7 @@ database_name = "FutureFitAI_database"
 collection_name = "talent_profiles_CAN"
 
 # Where to dump binaries
-binary_path = ""
+binary_path = "../binaries/"
 
 # How deep into the skill list do we want to go (sorted by value counts)
 # This will establish the width of matrix input to the clustering
