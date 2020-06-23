@@ -75,11 +75,10 @@ class Pipeline:
     # Conditions and mask may have to be modified based on DB structure
     def get_titles_and_skills_data(self, min_skill_length=5, drop_list=[]):
         conditions = {"$and": [{"skills.{}".format(min_skill_length-1): {"$exists": True}},
-                               {"clean_title": {"$exists": True, "$ne": None}}]}
+                               {"clean_title": {"$ne": None}}]}
         mask = {"_id": 0, "skills": 1, "clean_title": 1}
         profiles = self.collection.find(conditions, mask)
         for index, profile in enumerate(profiles):
-            if index > 100: break
             if any(drop in profile["clean_title"] for drop in drop_list):
                 continue
             self.titles_raw.append(profile["clean_title"])
