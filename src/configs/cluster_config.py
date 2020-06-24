@@ -13,7 +13,7 @@ min_skill_depth = 5000
 min_title_freq = 5
 # Minimum number of skills a profile has to contain to included in the data
 min_skill_length = 10
-# Subsample depth -- only used by cluster_subsample.py
+# Subsample depth -- for no subsampling, set this to 0
 subsample_depth = 200
 # Number of clusters to stop the clustering at
 n_cluster_stop = 1
